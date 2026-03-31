@@ -92,42 +92,51 @@ def main():
     ratio = remaining / limit if limit > 0 else 0
     color = ratio_color(ratio)
 
-    # 菜单栏标题 (简洁显示)
-    # print(f"{color} Kimi {remaining}/{limit}")
-    print(f"Kimi {(used / limit):.0%}")
-    print("---")
-
-    # 下拉菜单详情
-    # print(f"本周用量: {used} / {limit} | font=Menlo size=13")
-    print(f"本周用量: {(used / limit):.0%} | font=Menlo size=13")
-    # print(f"剩余额度: {remaining} ({ratio:.0%}) | font=Menlo size=13")
-    if reset_time:
-        # print(f"重置时间: {format_reset_time(reset_time)} | font=Menlo size=12")
-        print(f"{format_reset_time(reset_time)} | font=Menlo size=12")
-    print("---")
-
+    # 提取 300 分钟限额
+    min300_used = 0
+    min300_limit = 0
     limits = data.get("limits", [])
     for item in limits:
         detail = item.get("detail", item)
-        l = int(detail.get("limit", 0) or 0)
-        u = int(detail.get("used", 0) or 0)
-        r = int(detail.get("remaining", 0) or 0)
         window = item.get("window", {})
         duration = window.get("duration", "")
         time_unit = window.get("timeUnit", "")
-        if duration and "MINUTE" in time_unit:
-            label = f"{duration}分钟限额"
-        elif duration and "HOUR" in time_unit:
-            label = f"{duration}小时限额"
-        elif duration and "DAY" in time_unit:
-            label = f"{duration}天限额"
-        else:
-            label = "其他限额"
-        # print(f"{label}: {u}/{l} (余{r}) | font=Menlo size=12")
-        print(f"{label}: {(u / l):.0%} | font=Menlo size=12")
+        if str(duration) == "300" and "MINUTE" in time_unit:
+            min300_used = int(detail.get("used", 0) or 0)
+            min300_limit = int(detail.get("limit", 0) or 0)
+            break
+
+    # 菜单栏标题 (简洁显示)
+    print(f"W {(used / limit):.0%} H {(min300_used / min300_limit):.0%} | refresh=true")
+    print("---")
+
+    # 下拉菜单详情
+    print(f"本周用量: {(used / limit):.0%} | font=Menlo size=13")
+    if reset_time:
+        print(f"{format_reset_time(reset_time)} | font=Menlo size=12")
+    print("---")
+
+    # for item in limits:
+    #     detail = item.get("detail", item)
+    #     l = int(detail.get("limit", 0) or 0)
+    #     u = int(detail.get("used", 0) or 0)
+    #     r = int(detail.get("remaining", 0) or 0)
+    #     window = item.get("window", {})
+    #     duration = window.get("duration", "")
+    #     time_unit = window.get("timeUnit", "")
+    #     if duration and "MINUTE" in time_unit:
+    #         label = f"{duration}分钟限额"
+    #     elif duration and "HOUR" in time_unit:
+    #         label = f"{duration}小时限额"
+    #     elif duration and "DAY" in time_unit:
+    #         label = f"{duration}天限额"
+    #     else:
+    #         label = "其他限额"
+    #     # print(f"{label}: {u}/{l} (余{r}) | font=Menlo size=12")
+    #     print(f"{label}: {(u / l):.0%} | font=Menlo size=12")
 
     print("---")
-    print("刷新 | refresh=true")
+    # print("刷新 | refresh=true")
     print("Kimi Console | href=https://www.kimi.com/code/console")
 
 
