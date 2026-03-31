@@ -78,7 +78,7 @@ def main():
     try:
         data = fetch_usage()
     except Exception as e:
-        print("Kimi ❓")
+        print("Kimi ❓ | refresh=true")
         print("---")
         print(f"获取失败: {e}")
         return
@@ -107,13 +107,13 @@ def main():
             break
 
     # 菜单栏标题 (简洁显示)
-    print(f"W {(used / limit):.0%} H {(min300_used / min300_limit):.0%} | refresh=true")
+    print(f"W {(used / limit):.0%} H {(min300_used / min300_limit):.0%} | refresh=true size=13")
     print("---")
 
     # 下拉菜单详情
-    print(f"本周用量: {(used / limit):.0%} | font=Menlo size=13")
+    # print(f"本周用量: {(used / limit):.0%} | refresh=true font=Menlo size=13")
     if reset_time:
-        print(f"{format_reset_time(reset_time)} | font=Menlo size=12")
+        print(f"{format_reset_time(reset_time)} | refresh=true font=Menlo size=13")
     print("---")
 
     # for item in limits:
