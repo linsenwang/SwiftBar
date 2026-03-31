@@ -140,6 +140,7 @@ def main():
     # 提取 300 分钟限额
     min300_used = 0
     min300_limit = 0
+    min300_reset = ""
     limits = data.get("limits", [])
     for item in limits:
         detail = item.get("detail", item)
@@ -149,6 +150,7 @@ def main():
         if str(duration) == "300" and "MINUTE" in time_unit:
             min300_used = int(detail.get("used", 0) or 0)
             min300_limit = int(detail.get("limit", 0) or 0)
+            min300_reset = detail.get("resetTime", "")
             break
 
     # 菜单栏标题 (简洁显示)
@@ -159,6 +161,8 @@ def main():
     # print(f"本周用量: {(used / limit):.0%} | refresh=true font=Menlo size=13")
     if reset_time:
         print(f"{format_reset_time(reset_time)} | refresh=true font=Menlo size=13")
+    if min300_reset:
+        print(f"{format_reset_time(min300_reset)} | refresh=true font=Menlo size=13")
     print("---")
 
     # for item in limits:
