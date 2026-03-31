@@ -1,0 +1,135 @@
+#!/usr/bin/env python3
+# <swiftbar.hideAbout>true</swiftbar.hideAbout>
+# <swiftbar.hideRunInTerminal>true</swiftbar.hideRunInTerminal>
+# <swiftbar.hideLastUpdated>true</swiftbar.hideLastUpdated>
+# <swiftbar.hideDisablePlugin>true</swiftbar.hideDisablePlugin>
+# <swiftbar.hideSwiftBar>true</swiftbar.hideSwiftBar>
+
+"""
+SwiftBar / xbar 插件: Kimi Code 用量监控
+安装:
+1. 安装 SwiftBar: https://github.com/swiftbar/SwiftBar/releases
+2. 将本文件复制到 SwiftBar 插件目录:
+   cp kimi_usage.1h.py "$HOME/Library/Application Support/SwiftBar/plugins/"
+3. 确保文件可执行: chmod +x "$HOME/Library/Application Support/SwiftBar/plugins/kimi_usage.1h.py"
+4. SwiftBar 会自动识别并显示在菜单栏
+
+刷新频率: 1小时 (文件名中的 .1h. 控制)
+"""
+
+import json
+import os
+import urllib.request
+from datetime import datetime, timezone
+
+CREDENTIALS_PATH = os.path.expanduser("~/.kimi/credentials/kimi-code.json")
+USAGE_URL = "https://api.kimi.com/coding/v1/usages"
+
+
+def get_access_token() -> str:
+    with open(CREDENTIALS_PATH, "r") as f:
+        data = json.load(f)
+    return data["access_token"]
+
+
+def fetch_usage():
+    token = get_access_token()
+    req = urllib.request.Request(
+        USAGE_URL,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.load(resp)
+
+
+def format_reset_time(iso_str: str) -> str:
+    try:
+        dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        now = datetime.now(timezone.utc)
+        delta = dt - now
+        seconds = int(delta.total_seconds())
+        if seconds <= 0:
+            return "即将重置"
+        days = seconds // 86400
+        hours = (seconds % 86400) // 3600
+        mins = (seconds % 3600) // 60
+        parts = []
+        if days:
+            parts.append(f"{days}天")
+        if hours:
+            parts.append(f"{hours}小时")
+        if mins and days < 1:
+            parts.append(f"{mins}分钟")
+        return "".join(parts) + "后重置"
+    except Exception:
+        return iso_str
+
+
+def ratio_color(ratio: float) -> str:
+    # SwiftBar 支持 ANSI 颜色或 emoji 指示
+    if ratio >= 0.9:
+        return "🔴"
+    if ratio >= 0.7:
+        return "🟡"
+    return "🟢"
+
+
+def main():
+    try:
+        data = fetch_usage()
+    except Exception as e:
+        print("Kimi ❓")
+        print("---")
+        print(f"获取失败: {e}")
+        return
+
+    usage = data.get("usage", {})
+    limit = int(usage.get("limit", 0) or 0)
+    used = int(usage.get("used", 0) or 0)
+    remaining = int(usage.get("remaining", 0) or 0)
+    reset_time = usage.get("resetTime", "")
+
+    ratio = remaining / limit if limit > 0 else 0
+    color = ratio_color(ratio)
+
+    # 菜单栏标题 (简洁显示)
+    # print(f"{color} Kimi {remaining}/{limit}")
+    print(f"Kimi {(used / limit):.0%}")
+    print("---")
+
+    # 下拉菜单详情
+    # print(f"本周用量: {used} / {limit} | font=Menlo size=13")
+    print(f"本周用量: {(used / limit):.0%} | font=Menlo size=13")
+    # print(f"剩余额度: {remaining} ({ratio:.0%}) | font=Menlo size=13")
+    if reset_time:
+        # print(f"重置时间: {format_reset_time(reset_time)} | font=Menlo size=12")
+        print(f"{format_reset_time(reset_time)} | font=Menlo size=12")
+    print("---")
+
+    limits = data.get("limits", [])
+    for item in limits:
+        detail = item.get("detail", item)
+        l = int(detail.get("limit", 0) or 0)
+        u = int(detail.get("used", 0) or 0)
+        r = int(detail.get("remaining", 0) or 0)
+        window = item.get("window", {})
+        duration = window.get("duration", "")
+        time_unit = window.get("timeUnit", "")
+        if duration and "MINUTE" in time_unit:
+            label = f"{duration}分钟限额"
+        elif duration and "HOUR" in time_unit:
+            label = f"{duration}小时限额"
+        elif duration and "DAY" in time_unit:
+            label = f"{duration}天限额"
+        else:
+            label = "其他限额"
+        # print(f"{label}: {u}/{l} (余{r}) | font=Menlo size=12")
+        print(f"{label}: {(u / l):.0%} | font=Menlo size=12")
+
+    print("---")
+    print("刷新 | refresh=true")
+    print("Kimi Console | href=https://www.kimi.com/code/console")
+
+
+if __name__ == "__main__":
+    main()
