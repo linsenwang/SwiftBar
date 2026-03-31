@@ -19,7 +19,10 @@ SwiftBar / xbar 插件: Kimi Code 用量监控
 
 import json
 import os
+import subprocess
+import time
 import urllib.request
+import urllib.error
 from datetime import datetime, timezone
 
 CREDENTIALS_PATH = os.path.expanduser("~/.kimi/credentials/kimi-code.json")
@@ -32,14 +35,54 @@ def get_access_token() -> str:
     return data["access_token"]
 
 
-def fetch_usage():
+def fetch_usage(max_retries=3, base_delay=1.0, allow_refresh=True):
     token = get_access_token()
     req = urllib.request.Request(
         USAGE_URL,
         headers={"Authorization": f"Bearer {token}"},
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.load(resp)
+    
+    last_exception = None
+    for attempt in range(max_retries):
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                return json.load(resp)
+        except urllib.error.HTTPError as e:
+            last_exception = e
+            # 401 可能是 token 过期，尝试运行 kimi 刷新 session
+            if e.code == 401 and allow_refresh:
+                try:
+                    # 运行 kimi 命令触发登录流程刷新 token，设置超时避免长时间等待
+                    subprocess.run(
+                        ["kimi"],
+                        capture_output=True,
+                        timeout=15
+                    )
+                    # 重新读取 token
+                    token = get_access_token()
+                    req = urllib.request.Request(
+                        USAGE_URL,
+                        headers={"Authorization": f"Bearer {token}"},
+                    )
+                    # 不再允许刷新，避免无限循环
+                    allow_refresh = False
+                    continue
+                except Exception:
+                    pass
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                time.sleep(delay)
+            else:
+                raise last_exception
+        except (urllib.error.URLError, TimeoutError) as e:
+            last_exception = e
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)
+                time.sleep(delay)
+            else:
+                raise last_exception
+        except Exception:
+            raise
 
 
 def format_reset_time(iso_str: str) -> str:
@@ -55,12 +98,14 @@ def format_reset_time(iso_str: str) -> str:
         mins = (seconds % 3600) // 60
         parts = []
         if days:
-            parts.append(f"{days}天")
-        if hours:
-            parts.append(f"{hours}小时")
+            parts.append(f"{days}D ")
+        if hours and days < 1:
+            parts.append(f"{hours}H ")
+        if hours and days >= 1:
+            parts.append(f"{(hours + mins/60):.1f}H ")
         if mins and days < 1:
-            parts.append(f"{mins}分钟")
-        return "".join(parts) + "后重置"
+            parts.append(f"{mins}M")
+        return "".join(parts)# + "后重置"
     except Exception:
         return iso_str
 
