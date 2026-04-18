@@ -154,7 +154,13 @@ def main():
             break
 
     # 菜单栏标题 (简洁显示)
-    print(f"W {(used / limit):.0%} H {(min300_used / min300_limit):.0%} | refresh=true size=13")
+    w_ratio = used / limit if limit > 0 else 0
+    h_ratio = min300_used / min300_limit if min300_limit > 0 else 0
+    
+    w_display = format_reset_time(reset_time) if w_ratio >= 1 else f"{w_ratio:.0%}"
+    h_display = format_reset_time(min300_reset) if h_ratio >= 1 else f"{h_ratio:.0%}"
+    
+    print(f"W {w_display} H {h_display} | refresh=true size=13")
     print("---")
 
     # 下拉菜单详情
