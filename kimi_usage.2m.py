@@ -23,7 +23,7 @@ import subprocess
 import time
 import urllib.request
 import urllib.error
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 CREDENTIALS_PATH = os.path.expanduser("~/.kimi/credentials/kimi-code.json")
 USAGE_URL = "https://api.kimi.com/coding/v1/usages"
@@ -160,7 +160,27 @@ def main():
     w_display = format_reset_time(reset_time) if w_ratio >= 1 else f"{w_ratio:.0%}"
     h_display = format_reset_time(min300_reset) if h_ratio >= 1 else f"{h_ratio:.0%}"
     
-    print(f"W {w_display} H {h_display} | refresh=true size=13")
+    # 线性配额差值：按本周已过去比例计算预期用量，与实际用量对比
+    diff_display = ""
+    if reset_time and limit > 0:
+        try:
+            reset_dt = datetime.fromisoformat(reset_time.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            start_dt = reset_dt - timedelta(days=7)
+            elapsed = (now - start_dt).total_seconds()
+            total = 7 * 86400
+            if elapsed > 0:
+                elapsed = min(elapsed, total)
+                expected = limit * (elapsed / total)
+                diff = used - expected
+                diff_display = f"{diff:+.0f}"
+        except Exception:
+            pass
+    
+    title = f"W {w_display} H {h_display}"
+    if diff_display:
+        title += f" {diff_display}%"
+    print(f"{title} | refresh=true size=13")
     print("---")
 
     # 下拉菜单详情
