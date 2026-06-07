@@ -25,7 +25,7 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timedelta, timezone
 
-CREDENTIALS_PATH = os.path.expanduser("~/.kimi/credentials/kimi-code.json")
+CREDENTIALS_PATH = os.path.expanduser("~/.kimi-code/credentials/kimi-code.json")
 USAGE_URL = "https://api.kimi.com/coding/v1/usages"
 
 
@@ -54,7 +54,7 @@ def fetch_usage(max_retries=3, base_delay=1.0, allow_refresh=True):
                 try:
                     # 运行 kimi 命令触发登录流程刷新 token，设置超时避免长时间等待
                     subprocess.run(
-                        ["kimi"],
+                        [os.path.expanduser("~/.kimi-code/bin/kimi")],
                         capture_output=True,
                         timeout=15
                     )
@@ -96,6 +96,7 @@ def format_reset_time(iso_str: str) -> str:
         days = seconds // 86400
         hours = (seconds % 86400) // 3600
         mins = (seconds % 3600) // 60
+        secs = seconds % 60
         parts = []
         if days:
             parts.append(f"{days}D ")
@@ -105,6 +106,8 @@ def format_reset_time(iso_str: str) -> str:
             parts.append(f"{(hours + mins/60):.1f}H ")
         if mins and days < 1:
             parts.append(f"{mins}M")
+        if secs and not parts:
+            parts.append(f"{secs}S")
         return "".join(parts)# + "后重置"
     except Exception:
         return iso_str
@@ -123,7 +126,7 @@ def main():
     try:
         data = fetch_usage()
     except Exception as e:
-        print("Kimi ❓ | refresh=true")
+        print("Kimi | refresh=true")
         print("---")
         print(f"获取失败: {e}")
         return
@@ -176,6 +179,23 @@ def main():
                 diff_display = f"{diff:+.0f}"
         except Exception:
             pass
+
+    # 5小时限额差值
+    min300_diff_display = ""
+    if min300_reset and min300_limit > 0:
+        try:
+            reset_dt = datetime.fromisoformat(min300_reset.replace("Z", "+00:00"))
+            now = datetime.now(timezone.utc)
+            start_dt = reset_dt - timedelta(minutes=300)
+            elapsed = (now - start_dt).total_seconds()
+            total = 300 * 60
+            if elapsed > 0:
+                elapsed = min(elapsed, total)
+                expected = min300_limit * (elapsed / total)
+                diff = min300_used - expected
+                min300_diff_display = f"{diff:+.0f}%"
+        except Exception:
+            pass
     
     title = f"W {w_display} H {h_display}"
     if diff_display:
@@ -188,7 +208,10 @@ def main():
     if reset_time:
         print(f"{format_reset_time(reset_time)} | refresh=true font=Menlo size=13")
     if min300_reset:
-        print(f"{format_reset_time(min300_reset)} | refresh=true font=Menlo size=13")
+        h_disp = format_reset_time(min300_reset)
+        if min300_diff_display:
+            h_disp += f" {min300_diff_display}"
+        print(f"{h_disp} | refresh=true font=Menlo size=13")
     print("---")
 
     # for item in limits:
