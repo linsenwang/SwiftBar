@@ -44,6 +44,20 @@ TOKEN = "Y2FpeXVuIGFwaSB3ZWI"
 LNG, LAT = "118.0987", "24.4365"
 API_URL = f"https://api.caiyunapp.com/v2/{TOKEN}/{LNG},{LAT}/weather.jsonp"
 
+# 降雨等级（按小时降水强度 mm/h） → 返回 (图标, 映射用的 skycon_key)
+def precip_level(val):
+    if val < 0.1:
+        return "", ""
+    elif val <= 2.5:
+        return "💧", "LIGHT_RAIN"
+    elif val <= 8.0:
+        return "💦", "MODERATE_RAIN"
+    elif val <= 15.9:
+        return "🌧️", "HEAVY_RAIN"
+    else:
+        return "⛈️", "STORM_RAIN"
+
+
 # 天气现象映射
 SKYCON_MAP = {
     "CLEAR_DAY": "☀️ 晴",
@@ -277,11 +291,18 @@ def main():
                 time_label = "--:--"
 
             temp_val = h_temp.get("value", 0)
-            sky_val = SKYCON_MAP.get(h_sky.get("value", ""), h_sky.get("value", ""))
+            precip_val = h_precip.get("value", 0)
+            p_icon, p_skycon_key = precip_level(precip_val)
+
+            sky_raw = h_sky.get("value", "")
+            # 如果 API 返回泛化的 RAIN，根据降水量细化成具体等级
+            if sky_raw == "RAIN" and precip_val > 0.05 and p_skycon_key:
+                sky_raw = p_skycon_key
+
+            sky_val = SKYCON_MAP.get(sky_raw, sky_raw)
             sky_icon = sky_val.split()[0] if " " in sky_val else "🌡️"
             sky_text = sky_val.split()[-1] if " " in sky_val else sky_val
-            precip_val = h_precip.get("value", 0)
-            precip_str = f"💧{precip_val:.1f}mm" if precip_val > 0.05 else ""
+            precip_str = f"{p_icon}{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
             w_spd = h_wind.get("speed", 0)
             w_dir = wind_direction(h_wind.get("direction", 0))
             aqi_val = int(h_aqi.get("value", 0) or 0)
