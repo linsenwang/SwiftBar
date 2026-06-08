@@ -19,6 +19,27 @@ import random
 from datetime import datetime, timedelta
 
 # 配置
+# -----------------------------------------------------------------------------
+# TOKEN 来源说明:
+#   这个 token 是从彩云天气 H5 页面 (https://www.caiyunapp.com/h5/) 逆向抓包
+#   得到的。H5 页面除了走 /api/ 反向代理（需要 ticket）外，还会直接发一个
+#   .jsonp 请求到 api.caiyunapp.com，用的就是这个硬编码 token:
+#
+#       Y2FpeXVuIGFwaSB3ZWI   (Base64 解码后是 "caiyun api w")
+#
+#   抓包方法（token 失效后重新获取）:
+#   1. 打开 https://www.caiyunapp.com/h5/ 并允许定位（或让它 fallback 到默认坐标）
+#   2. 打开浏览器 DevTools -> Network
+#   3. 过滤 "api.caiyunapp.com/v2/"
+#   4. 找到类似这样的请求:
+#       https://api.caiyunapp.com/v2/XXXXXXXX/116.4074,39.9042/forecast.jsonp?...
+#      其中 XXXXXXXX 就是 token
+#   5. 把这个 token 填到下面的 TOKEN 变量里即可
+#
+#   备选方案: 如果 H5 的 token 彻底失效，可以去彩云开放平台
+#   https://platform.caiyunapp.com/ 注册申请自己的 token，每天有免费额度，
+#   替换掉下面的 TOKEN 即可。
+# -----------------------------------------------------------------------------
 TOKEN = "Y2FpeXVuIGFwaSB3ZWI"
 LNG, LAT = "118.0987", "24.4365"
 API_URL = f"https://api.caiyunapp.com/v2/{TOKEN}/{LNG},{LAT}/weather.jsonp"
@@ -169,9 +190,9 @@ def main():
     print("---")
 
     # 预报摘要
-    # if forecast_keypoint:
-    #     print(f"{forecast_keypoint} | font=PingFangSC size=13")
-    #     print("---")
+    if forecast_keypoint:
+        print(f"{forecast_keypoint.replace('呢', '').replace('最近的', '')} | font=PingFangSC size=13 refresh=true")
+        print("---")
 
     # 实时天气
     print(f"🌡️ 温度 {temp:.1f}°C  体感 {apparent_temp:.1f}°C | font=PingFangSC size=13 refresh=true")
@@ -189,8 +210,8 @@ def main():
             print(f"🌧️ 当前降雨: {intensity:.2f}mm/h | font=PingFangSC size=13 refresh=true")
         elif nearest_rain.get("status") == "ok":
             dist = nearest_rain.get("distance", 0)
-            if dist > 0:
-                print(f"☁️ 最近降雨: {dist:.0f}km 外 | font=PingFangSC size=13 refresh=true")
+            # if dist > 0:
+            #     print(f"☁️ 最近降雨: {dist:.0f}km 外 | font=PingFangSC size=13 refresh=true")
     print("---")
 
     # 空气质量
@@ -302,7 +323,7 @@ def main():
         w_dir_str = wind_direction(w_dir_val)
 
         # line = f"{sky_icon} {label}({date_str}) {t_min:.0f}°~{t_max:.0f}° {sky.split()[-1] if ' ' in sky else sky} 风{w_dir_str}{w_spd:.0f}m/s AQI{aqi_val}{aqi_lbl}"
-        line = f"{sky_icon} {label}({date_str}) {t_min:.0f}°~{t_max:.0f}° {sky.split()[-1] if ' ' in sky else sky}"
+        line = f"{sky_icon} {label} {date_str} {t_min:.0f}°~{t_max:.0f}° {sky.split()[-1] if ' ' in sky else sky}"
         print(f"{line} | font=PingFangSC size=13 refresh=true")
 
     print("---")

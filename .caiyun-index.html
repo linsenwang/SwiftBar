@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>厦门天气 - 彩云天气</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #fff;
+        }
+
+        body.rainy {
+            background: linear-gradient(135deg, #4b6cb7 0%, #182848 100%);
+        }
+
+        body.cloudy {
+            background: linear-gradient(135deg, #8e9eab 0%, #eef2f3 100%);
+            color: #333;
+        }
+
+        body.clear {
+            background: linear-gradient(135deg, #f6d365 0%, #fda085 100%);
+            color: #333;
+        }
+
+        body.night {
+            background: linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%);
+        }
+
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            opacity: 0.9;
+        }
+
+        .location {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .update-time {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-top: 4px;
+        }
+
+        .refresh-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: inherit;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            cursor: pointer;
+            margin-top: 8px;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+
+        .refresh-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .refresh-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .main-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        body.cloudy .main-card,
+        body.clear .main-card {
+            background: rgba(255,255,255,0.4);
+            border-color: rgba(255,255,255,0.3);
+        }
+
+        .weather-icon {
+            font-size: 80px;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .temperature {
+            font-size: 64px;
+            font-weight: 200;
+            line-height: 1;
+        }
+
+        .temperature sup {
+            font-size: 28px;
+            font-weight: 400;
+        }
+
+        .weather-desc {
+            font-size: 20px;
+            margin-top: 8px;
+            opacity: 0.95;
+        }
+
+        .feels-like {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-top: 6px;
+        }
+
+        .forecast-keypoint {
+            font-size: 14px;
+            opacity: 0.85;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 12px;
+            display: inline-block;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 16px;
+        }
+
+        .detail-item {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 14px 8px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        body.cloudy .detail-item,
+        body.clear .detail-item {
+            background: rgba(255,255,255,0.35);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .detail-icon {
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+
+        .detail-label {
+            font-size: 11px;
+            opacity: 0.7;
+            margin-bottom: 2px;
+        }
+
+        .detail-value {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            opacity: 0.9;
+            padding-left: 4px;
+        }
+
+        .hourly-section {
+            margin-bottom: 16px;
+        }
+
+        .hourly-scroll {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 4px;
+            scrollbar-width: none;
+        }
+
+        .hourly-scroll::-webkit-scrollbar {
+            display: none;
+        }
+
+        .hourly-item {
+            flex: 0 0 auto;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 12px 10px;
+            text-align: center;
+            min-width: 64px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        body.cloudy .hourly-item,
+        body.clear .hourly-item {
+            background: rgba(255,255,255,0.35);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .hourly-time {
+            font-size: 12px;
+            opacity: 0.8;
+            margin-bottom: 6px;
+        }
+
+        .hourly-icon {
+            font-size: 24px;
+            margin-bottom: 4px;
+        }
+
+        .hourly-temp {
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .hourly-precip {
+            font-size: 10px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+
+        .daily-section {
+            margin-bottom: 16px;
+        }
+
+        .daily-item {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        body.cloudy .daily-item,
+        body.clear .daily-item {
+            background: rgba(255,255,255,0.35);
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .daily-date {
+            flex: 0 0 70px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .daily-icon {
+            flex: 0 0 36px;
+            font-size: 24px;
+            text-align: center;
+        }
+
+        .daily-skycon {
+            flex: 1;
+            font-size: 14px;
+            opacity: 0.9;
+            padding: 0 8px;
+        }
+
+        .daily-temp {
+            flex: 0 0 90px;
+            text-align: right;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .error-card {
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(20px);
+            border-radius: 24px;
+            padding: 40px 30px;
+            text-align: center;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            font-size: 12px;
+            opacity: 0.5;
+            margin-top: 20px;
+        }
+
+        .footer a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="location">📍 厦门</div>
+            <div class="update-time" id="updateTime">正在获取天气...</div>
+            <button class="refresh-btn" id="refreshBtn" onclick="loadWeather()" disabled>刷新</button>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="spinner"></div>
+            <div>正在获取天气数据...</div>
+        </div>
+
+        <div id="error" class="error-card hidden">
+            <div style="font-size: 48px; margin-bottom: 12px;">😵</div>
+            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px;">获取天气失败</div>
+            <div style="font-size: 14px; opacity: 0.8; margin-bottom: 16px;" id="errorMsg">请检查网络连接</div>
+            <button class="refresh-btn" onclick="loadWeather()">重试</button>
+        </div>
+
+        <div id="content" class="hidden">
+            <div class="main-card">
+                <div class="weather-icon" id="mainIcon">🌡️</div>
+                <div class="temperature"><span id="mainTemp">--</span><sup>°C</sup></div>
+                <div class="weather-desc" id="mainDesc">--</div>
+                <div class="feels-like">体感 <span id="feelsLike">--</span>°C</div>
+                <div class="forecast-keypoint hidden" id="keypoint"></div>
+            </div>
+
+            <div class="details-grid" id="details">
+                <div class="detail-item">
+                    <div class="detail-icon">💧</div>
+                    <div class="detail-label">相对湿度</div>
+                    <div class="detail-value" id="humidity">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-icon">💨</div>
+                    <div class="detail-label">风向风速</div>
+                    <div class="detail-value" id="wind">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-icon">🫁</div>
+                    <div class="detail-label">空气质量</div>
+                    <div class="detail-value" id="aqi">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-icon">👁️</div>
+                    <div class="detail-label">能见度</div>
+                    <div class="detail-value" id="visibility">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-icon">🔽</div>
+                    <div class="detail-label">气压</div>
+                    <div class="detail-value" id="pressure">--</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-icon">☀️</div>
+                    <div class="detail-label">紫外线</div>
+                    <div class="detail-value" id="uv">--</div>
+                </div>
+            </div>
+
+            <div class="hourly-section" id="hourlySection">
+                <div class="section-title">⏰ 逐小时预报</div>
+                <div class="hourly-scroll" id="hourly"></div>
+            </div>
+
+            <div class="daily-section" id="dailySection">
+                <div class="section-title">📅 未来预报</div>
+                <div id="daily"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <a href="https://www.caiyunapp.com/h5/" target="_blank">数据来自彩云天气</a>
+        </div>
+    </div>
+
+    <script>
+        const TOKEN = "Y2FpeXVuIGFwaSB3ZWI";
+        const LNG = "118.0987";
+        const LAT = "24.4365";
+        const API_URL = `https://api.caiyunapp.com/v2/${TOKEN}/${LNG},${LAT}/weather.jsonp`;
+
+        const SKYCON_MAP = {
+            "CLEAR_DAY": ["☀️", "晴"],
+            "CLEAR_NIGHT": ["🌙", "晴"],
+            "PARTLY_CLOUDY_DAY": ["⛅", "多云"],
+            "PARTLY_CLOUDY_NIGHT": ["🌤️", "多云"],
+            "CLOUDY": ["☁️", "阴"],
+            "LIGHT_RAIN": ["🌧️", "小雨"],
+            "MODERATE_RAIN": ["🌧️", "中雨"],
+            "HEAVY_RAIN": ["⛈️", "大雨"],
+            "STORM_RAIN": ["⛈️", "暴雨"],
+            "LIGHT_SNOW": ["🌨️", "小雪"],
+            "MODERATE_SNOW": ["🌨️", "中雪"],
+            "HEAVY_SNOW": ["🌨️", "大雪"],
+            "STORM_SNOW": ["❄️", "暴雪"],
+            "WIND": ["💨", "大风"],
+            "FOG": ["🌫️", "雾"],
+            "HAZE": ["😷", "霾"],
+            "RAIN": ["🌧️", "雨"],
+        };
+
+        function aqiLevel(aqi) {
+            if (aqi <= 50) return ["🟢", "优"];
+            if (aqi <= 100) return ["🟡", "良"];
+            if (aqi <= 150) return ["🟠", "轻度"];
+            if (aqi <= 200) return ["🔴", "中度"];
+            if (aqi <= 300) return ["🟣", "重度"];
+            return ["⚫", "严重"];
+        }
+
+        function windDirection(deg) {
+            const dirs = ["北", "东北", "东", "东南", "南", "西南", "西", "西北"];
+            return dirs[Math.round(deg / 45) % 8];
+        }
+
+        function windDesc(speed) {
+            if (speed < 0.3) return "静风";
+            if (speed < 1.6) return "软风";
+            if (speed < 3.4) return "轻风";
+            if (speed < 5.5) return "微风";
+            if (speed < 8.0) return "和风";
+            if (speed < 10.8) return "清风";
+            if (speed < 13.9) return "强风";
+            if (speed < 17.2) return "疾风";
+            if (speed < 20.8) return "大风";
+            if (speed < 24.5) return "烈风";
+            if (speed < 28.5) return "狂风";
+            if (speed < 32.7) return "暴风";
+            return "飓风";
+        }
+
+        function getSkycon(raw) {
+            return SKYCON_MAP[raw] || ["🌡️", raw];
+        }
+
+        function updateTheme(skyconRaw) {
+            document.body.className = "";
+            const hour = new Date().getHours();
+            const isNight = hour < 6 || hour >= 18;
+
+            if (skyconRaw.includes("RAIN") || skyconRaw.includes("SNOW")) {
+                document.body.classList.add("rainy");
+            } else if (skyconRaw.includes("CLOUDY") || skyconRaw === "CLOUDY" || skyconRaw === "FOG" || skyconRaw === "HAZE") {
+                document.body.classList.add("cloudy");
+            } else if (skyconRaw.includes("CLEAR") && isNight) {
+                document.body.classList.add("night");
+            } else if (skyconRaw.includes("CLEAR")) {
+                document.body.classList.add("clear");
+            } else {
+                document.body.classList.add(isNight ? "night" : "clear");
+            }
+        }
+
+        async function loadWeather() {
+            document.getElementById("loading").classList.remove("hidden");
+            document.getElementById("error").classList.add("hidden");
+            document.getElementById("content").classList.add("hidden");
+            document.getElementById("refreshBtn").disabled = true;
+            document.getElementById("refreshBtn").textContent = "刷新中...";
+
+            try {
+                const url = `${API_URL}?hourlysteps=120&random=${Math.random()}`;
+                const resp = await fetch(url, {
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+                        "Referer": "https://www.caiyunapp.com/h5/",
+                    }
+                });
+                const data = await resp.json();
+
+                if (!data || data.status !== "ok") {
+                    throw new Error("API 返回错误");
+                }
+
+                render(data);
+            } catch (err) {
+                // 主请求失败，尝试 CORS 代理
+                try {
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`${API_URL}?hourlysteps=120&random=${Math.random()}`)}`;
+                    const resp2 = await fetch(proxyUrl);
+                    const data2 = await resp2.json();
+                    if (data2 && data2.status === "ok") {
+                        render(data2);
+                        return;
+                    }
+                } catch (e2) {}
+                document.getElementById("loading").classList.add("hidden");
+                document.getElementById("error").classList.remove("hidden");
+                document.getElementById("errorMsg").textContent = err.message || "请检查网络连接";
+            } finally {
+                document.getElementById("refreshBtn").disabled = false;
+                document.getElementById("refreshBtn").textContent = "刷新";
+            }
+        }
+
+        function render(data) {
+            const result = data.result || {};
+            const rt = result.realtime || {};
+            const daily = result.daily || {};
+            const forecastKeypoint = result.forecast_keypoint || "";
+
+            const serverTime = data.server_time || 0;
+            const updateDt = new Date(serverTime * 1000);
+            const updateStr = updateDt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+
+            const temp = rt.temperature || 0;
+            const skyconRaw = rt.skycon || "UNKNOWN";
+            const [skyIcon, skyText] = getSkycon(skyconRaw);
+            const aqi = Math.round(rt.aqi || 0);
+            const [aqiIcon, aqiText] = aqiLevel(aqi);
+            const humidity = Math.round((rt.humidity || 0) * 100);
+            const wind = rt.wind || {};
+            const windSpeed = wind.speed || 0;
+            const windDir = windDirection(wind.direction || 0);
+            const apparentTemp = rt.apparent_temperature ?? temp;
+            const uv = rt.ultraviolet || {};
+            const comfort = rt.comfort || {};
+            const precip = rt.precipitation || {};
+            const nearestRain = precip.nearest || {};
+            const localRain = precip.local || {};
+
+            updateTheme(skyconRaw);
+
+            document.getElementById("updateTime").textContent = `更新于 ${updateStr}`;
+            document.getElementById("mainIcon").textContent = skyIcon;
+            document.getElementById("mainTemp").textContent = temp.toFixed(1);
+            document.getElementById("mainDesc").textContent = skyText;
+            document.getElementById("feelsLike").textContent = apparentTemp.toFixed(1);
+
+            const kp = document.getElementById("keypoint");
+            if (forecastKeypoint) {
+                kp.textContent = forecastKeypoint.replace(/呢/g, "").replace(/最近的/g, "");
+                kp.classList.remove("hidden");
+            } else {
+                kp.classList.add("hidden");
+            }
+
+            document.getElementById("humidity").textContent = `${humidity}%`;
+            document.getElementById("wind").textContent = `${windDir} ${windSpeed.toFixed(1)}m/s`;
+            document.getElementById("aqi").textContent = `${aqiIcon} ${aqi} ${aqiText}`;
+            document.getElementById("visibility").textContent = `${(rt.visibility || 0).toFixed(1)}km`;
+            document.getElementById("pressure").textContent = `${((rt.pres || 0) / 100).toFixed(0)}hPa`;
+
+            const uvDesc = uv.desc || comfort.desc || "--";
+            document.getElementById("uv").textContent = uvDesc;
+
+            // Hourly
+            const hourly = result.hourly || {};
+            const hourlyTemp = hourly.temperature || [];
+            const hourlySkycon = hourly.skycon || [];
+            const hourlyPrecip = hourly.precipitation || [];
+            const hourlyWind = hourly.wind || [];
+            const hourlyAqi = hourly.aqi || [];
+
+            const now = new Date();
+            let startIdx = 0;
+            for (let i = 0; i < hourlyTemp.length; i++) {
+                const dtStr = hourlyTemp[i].datetime || "";
+                try {
+                    const hDt = new Date(dtStr.replace(" ", "T"));
+                    if (hDt.getHours() === now.getHours()) {
+                        startIdx = i;
+                        break;
+                    } else if (hDt > now && startIdx === 0) {
+                        startIdx = i;
+                    }
+                } catch (e) {}
+            }
+
+            const hourlyHtml = [];
+            for (let i = startIdx; i < Math.min(startIdx + 12, hourlyTemp.length); i++) {
+                const hTemp = hourlyTemp[i];
+                const hSky = hourlySkycon[i] || {};
+                const hPrecip = hourlyPrecip[i] || {};
+                const hWind = hourlyWind[i] || {};
+                const hAqi = hourlyAqi[i] || {};
+
+                const dtStr = hTemp.datetime || "";
+                let timeLabel = "--:--";
+                try {
+                    const hDt = new Date(dtStr.replace(" ", "T"));
+                    timeLabel = hDt.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+                    if (hDt.getHours() === now.getHours()) timeLabel = "现在";
+                } catch (e) {}
+
+                const tempVal = hTemp.value || 0;
+                const [hIcon, hText] = getSkycon(hSky.value || "");
+                const precipVal = hPrecip.value || 0;
+                const precipStr = precipVal > 0.05 ? `💧${precipVal.toFixed(1)}mm` : "";
+                const wSpd = hWind.speed || 0;
+                const wDir = windDirection(hWind.direction || 0);
+                const aqiVal = Math.round(hAqi.value || 0);
+                const aqiIcon = aqiVal <= 50 ? "🟢" : (aqiVal <= 100 ? "🟡" : "🟠");
+
+                hourlyHtml.push(`
+                    <div class="hourly-item">
+                        <div class="hourly-time">${timeLabel}</div>
+                        <div class="hourly-icon">${hIcon}</div>
+                        <div class="hourly-temp">${tempVal.toFixed(0)}°</div>
+                        ${precipStr ? `<div class="hourly-precip">${precipStr}</div>` : ""}
+                    </div>
+                `);
+            }
+            document.getElementById("hourly").innerHTML = hourlyHtml.join("");
+            document.getElementById("hourlySection").classList.toggle("hidden", hourlyHtml.length === 0);
+
+            // Daily
+            const dailyTemp = daily.temperature || [];
+            const dailySkycon = daily.skycon || [];
+            const dailyAqi = daily.aqi || [];
+            const dailyWind = daily.wind || [];
+            const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+
+            const dailyHtml = [];
+            for (let i = 0; i < Math.min(5, dailyTemp.length); i++) {
+                const dt = new Date();
+                dt.setDate(dt.getDate() + i);
+                const wd = weekdays[dt.getDay()];
+                const dateStr = `${(dt.getMonth()+1).toString().padStart(2,"0")}-${dt.getDate().toString().padStart(2,"0")}`;
+                const label = i === 0 ? "今天" : (i === 1 ? "明天" : wd);
+
+                const t = dailyTemp[i];
+                const s = dailySkycon[i] || {};
+                const a = dailyAqi[i] || {};
+                const w = dailyWind[i] || {};
+
+                const tMax = t.max || 0;
+                const tMin = t.min || 0;
+                const [dIcon, dText] = getSkycon(s.value || "");
+                const aqiVal = Math.round(a.avg || 0);
+                const [, aqiLbl] = aqiLevel(aqiVal);
+
+                const wAvg = w.avg || {};
+                const wSpd = wAvg.speed || 0;
+                const wDirStr = windDirection(wAvg.direction || 0);
+
+                dailyHtml.push(`
+                    <div class="daily-item">
+                        <div class="daily-date">${label}<br><span style="font-size:11px;opacity:0.7;font-weight:400;">${dateStr}</span></div>
+                        <div class="daily-icon">${dIcon}</div>
+                        <div class="daily-skycon">${dText}</div>
+                        <div class="daily-temp">${tMin.toFixed(0)}° ~ ${tMax.toFixed(0)}°</div>
+                    </div>
+                `);
+            }
+            document.getElementById("daily").innerHTML = dailyHtml.join("");
+            document.getElementById("dailySection").classList.toggle("hidden", dailyHtml.length === 0);
+
+            document.getElementById("loading").classList.add("hidden");
+            document.getElementById("content").classList.remove("hidden");
+        }
+
+        loadWeather();
+    </script>
+</body>
+</html>
