@@ -14,8 +14,9 @@ SwiftBar 插件: 彩云天气
 
 import json
 import urllib.request
-import urllib.error
+import re
 import random
+import base64
 from datetime import datetime, timedelta
 
 # 配置
@@ -43,6 +44,121 @@ from datetime import datetime, timedelta
 TOKEN = "Y2FpeXVuIGFwaSB3ZWI"
 LNG, LAT = "118.0987", "24.4365"
 API_URL = f"https://api.caiyunapp.com/v2/{TOKEN}/{LNG},{LAT}/weather.jsonp"
+
+import struct
+import zlib
+
+
+def _png_chunk(chunk_type, data):
+    chunk = chunk_type + data
+    crc = zlib.crc32(chunk) & 0xffffffff
+    return struct.pack(">I", len(data)) + chunk + struct.pack(">I", crc)
+
+
+def _encode_png(rgba_pixels, width, height):
+    """纯标准库 PNG 编码器（RGBA 8bit）"""
+    raw = b""
+    for y in range(height):
+        raw += b"\x00"
+        for x in range(width):
+            raw += bytes(rgba_pixels[y * width + x])
+    compressed = zlib.compress(raw)
+    sig = b"\x89PNG\r\n\x1a\n"
+    ihdr = _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+    idat = _png_chunk(b"IDAT", compressed)
+    iend = _png_chunk(b"IEND", b"")
+    return sig + ihdr + idat + iend
+
+
+def _rain_color(val):
+    """根据降雨强度返回 (r, g, b, a)，暖色调：黄→橙→红，参考彩云官方配色"""
+    if val < 0.05:
+        # 接近无雨：浅黄绿，低透明度
+        return (200, 230, 170, 140)
+    elif val < 0.5:
+        # 小雨：浅黄绿 → 黄色 → 浅橙
+        t = (val - 0.05) / 0.45
+        r = int(200 + (255 - 200) * t)
+        g = int(230 + (190 - 230) * t)
+        b = int(170 + (70 - 170) * t)
+        return (r, g, b, 230)
+    elif val < 2.5:
+        # 中雨：浅橙 → 橙色
+        t = (val - 0.5) / 2.0
+        r = 255
+        g = int(190 + (130 - 190) * t)
+        b = int(70 + (30 - 70) * t)
+        return (r, g, b, 230)
+    elif val < 8.0:
+        # 大雨：橙色 → 红色
+        t = (val - 2.5) / 5.5
+        r = int(255 + (230 - 255) * t)
+        g = int(130 + (50 - 130) * t)
+        b = int(30 + (40 - 30) * t)
+        return (r, g, b, 230)
+    elif val < 15.9:
+        # 暴雨：红色 → 深红
+        t = (val - 8.0) / 7.9
+        r = int(230 + (180 - 230) * t)
+        g = int(50 + (20 - 50) * t)
+        b = int(40 + (20 - 40) * t)
+        return (r, g, b, 230)
+    else:
+        # 大暴雨：深红
+        return (160, 20, 20, 230)
+
+
+def render_rain_chart(precip_2h):
+    if not precip_2h or len(precip_2h) < 60:
+        return None
+    # 使用全部 120 个分钟级数据点
+    values = precip_2h[:120]
+    n = len(values)
+    bar_w = 2
+    gap = 0
+    pad_left = 0
+    W = n * bar_w
+    H = 60
+    # 全透明背景
+    pixels = [(0, 0, 0, 0)] * (W * H)
+    height_threshold = 0.4
+    max_val = max(max(values), height_threshold) if max(values) > 0 else height_threshold
+    for i, val in enumerate(values):
+        x0 = pad_left + i * (bar_w + gap)
+        x1 = x0 + bar_w
+        bar_h = max(2, int((val / max_val) * (H - 8)))
+        y0 = H - bar_h - 2
+        y1 = H - 2
+        color = _rain_color(val)
+        for y in range(y0, y1):
+            for x in range(x0, x1):
+                if 0 <= x < W and 0 <= y < H:
+                    pixels[y * W + x] = color
+
+    # 固定阈值横线：0.1mm/h（小雨下限）和 0.5mm/h（小雨上限）
+    line_color = (160, 160, 160, 140)
+    for threshold in (0.1, 0.3):
+        if threshold <= max_val:
+            ly = H - 2 - int((threshold / max_val) * (H - 8))
+            if 0 <= ly < H:
+                for x in range(W):
+                    pixels[ly * W + x] = line_color
+
+    png_data = _encode_png(pixels, W, H)
+    return base64.b64encode(png_data).decode()
+
+
+def render_rain_ansi(precip_2h):
+    """用 ANSI 24-bit 颜色代码绘制降雨柱状图（纯文本）"""
+    if not precip_2h or len(precip_2h) < 60:
+        return None
+    values = [precip_2h[i] for i in range(0, 120, 10)]
+    bars = ""
+    for val in values:
+        r, g, b, _ = _rain_color(val)
+        bars += f"\x1b[38;2;{r};{g};{b}m█\x1b[0m"
+    return bars
+
 
 # 降雨等级（按小时降水强度 mm/h） → 返回 (图标, 映射用的 skycon_key)
 def precip_level(val):
@@ -178,6 +294,9 @@ def main():
     nearest_rain = precip.get("nearest", {})
     local_rain = precip.get("local", {})
 
+    # 分钟级预报
+    minutely = result.get("minutely", {})
+
     # 逐小时预报
     hourly = result.get("hourly", {})
     hourly_temp = hourly.get("temperature", [])
@@ -205,7 +324,7 @@ def main():
 
     # 预报摘要
     if forecast_keypoint:
-        print(f"{forecast_keypoint.replace('呢', '').replace('最近的', '')} | font=PingFangSC size=13 refresh=true")
+        print(f"{re.sub(r'呢|最近的|吧|~|哦|您|还是|把', '', forecast_keypoint)} | font=PingFangSC size=13 refresh=true")
         print("---")
 
     # 实时天气
@@ -221,11 +340,23 @@ def main():
     if local_rain.get("status") == "ok":
         intensity = local_rain.get("intensity", 0)
         if intensity > 0:
-            print(f"🌧️ 当前降雨: {intensity:.2f}mm/h | font=PingFangSC size=13 refresh=true")
+            print(f"当前降雨: {intensity:.2f}mm/h | font=PingFangSC size=13 refresh=true")
         elif nearest_rain.get("status") == "ok":
             dist = nearest_rain.get("distance", 0)
             # if dist > 0:
             #     print(f"☁️ 最近降雨: {dist:.0f}km 外 | font=PingFangSC size=13 refresh=true")
+    # 分钟级降雨趋势（API 不保证始终返回）
+    if minutely.get("status") == "ok":
+        # m_desc = minutely.get("description", "")
+        # if m_desc:
+        #     print(f"⏱️ {m_desc} | font=PingFangSC size=13 refresh=true")
+
+        m_precip_2h = minutely.get("precipitation_2h", [])
+        chart_b64 = render_rain_chart(m_precip_2h)
+        if chart_b64:
+            # print(f"📊 未来2h降雨趋势 | font=PingFangSC size=13 refresh=true")
+            print(f" | image={chart_b64} refresh=true")
+
     print("---")
 
     # 空气质量
