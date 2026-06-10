@@ -109,15 +109,22 @@ def _rain_color(val):
 
 
 def render_rain_chart(precip_2h):
-    if not precip_2h or len(precip_2h) < 60:
+    if not precip_2h or len(precip_2h) < 60 or max(precip_2h) < 0.05:
         return None
-    # 使用全部 120 个分钟级数据点
-    values = precip_2h[:120]
+    # 原始数据最多 120 个分钟级数据点，线性插值到 240 个点
+    raw = precip_2h[:120]
+    values = []
+    for i in range(240):
+        f = i / 239.0 * (len(raw) - 1)
+        i0 = int(f)
+        i1 = min(i0 + 1, len(raw) - 1)
+        t = f - i0
+        values.append(raw[i0] * (1 - t) + raw[i1] * t)
     n = len(values)
-    bar_w = 2
+    bar_w = 1
     gap = 0
     pad_left = 0
-    W = n * bar_w
+    W = 240
     H = 60
     # 全透明背景
     pixels = [(0, 0, 0, 0)] * (W * H)
@@ -324,7 +331,10 @@ def main():
 
     # 预报摘要
     if forecast_keypoint:
-        print(f"{re.sub(r'呢|最近的|吧|~|哦|您|还是|把', '', forecast_keypoint)} | font=PingFangSC size=13 refresh=true")
+        cleaned_forecast_keypoint = re.sub(r'呢|最近的|吧|~|哦|您|还是|把', '', forecast_keypoint)
+        forecast_keypoint_list = cleaned_forecast_keypoint.split('，')
+        for lines in forecast_keypoint_list:
+            print(f"{lines} | font=PingFangSC size=13 refresh=true")
         print("---")
 
     # 实时天气
@@ -346,11 +356,12 @@ def main():
             # if dist > 0:
             #     print(f"☁️ 最近降雨: {dist:.0f}km 外 | font=PingFangSC size=13 refresh=true")
     # 分钟级降雨趋势（API 不保证始终返回）
-    if minutely.get("status") == "ok":
+    # if minutely.get("status") == "ok":
         # m_desc = minutely.get("description", "")
         # if m_desc:
         #     print(f"⏱️ {m_desc} | font=PingFangSC size=13 refresh=true")
 
+    if minutely.get("status") == "ok":
         m_precip_2h = minutely.get("precipitation_2h", [])
         chart_b64 = render_rain_chart(m_precip_2h)
         if chart_b64:
