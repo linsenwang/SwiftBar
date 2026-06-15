@@ -167,6 +167,67 @@ def render_rain_ansi(precip_2h):
     return bars
 
 
+def format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now):
+    """格式化单条逐小时预报行"""
+    h_temp = hourly_temp[i]
+    h_sky = hourly_skycon[i] if i < len(hourly_skycon) else {}
+    h_precip = hourly_precip[i] if i < len(hourly_precip) else {}
+    h_wind = hourly_wind[i] if i < len(hourly_wind) else {}
+    h_aqi = hourly_aqi[i] if i < len(hourly_aqi) else {}
+
+    dt_str = h_temp.get("datetime", "")
+    try:
+        h_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
+        if h_dt.date() == now.date() and h_dt.hour == now.hour:
+            time_label = "现在"
+        elif h_dt.date() == now.date():
+            time_label = h_dt.strftime("%H:%M")
+        else:
+            time_label = h_dt.strftime("%m-%d %H:%M")
+    except Exception:
+        time_label = "--:--"
+
+    temp_val = h_temp.get("value", 0)
+    precip_val = h_precip.get("value", 0)
+    p_icon, p_skycon_key = precip_level(precip_val)
+
+    sky_raw = h_sky.get("value", "")
+    # 如果 API 返回泛化的 RAIN，根据降水量细化成具体等级
+    if sky_raw == "RAIN" and precip_val > 0.05 and p_skycon_key:
+        sky_raw = p_skycon_key
+
+    sky_val = SKYCON_MAP.get(sky_raw, sky_raw)
+    sky_icon = sky_val.split()[0] if " " in sky_val else "🌡️"
+    sky_text = sky_val.split()[-1] if " " in sky_val else sky_val
+    precip_str = f"{p_icon}{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
+
+    parts = [f"{sky_icon} {time_label} {temp_val:.0f}° {sky_text}"]
+    if precip_str:
+        parts.append(precip_str)
+    return " ".join(parts)
+
+
+def format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today, weekdays):
+    """格式化单条天级预报行"""
+    t = daily_temp[i]
+    s = daily_skycon[i] if i < len(daily_skycon) else {}
+    a = daily_aqi[i] if i < len(daily_aqi) else {}
+    w = daily_wind[i] if i < len(daily_wind) else {}
+
+    dt = today + timedelta(days=i)
+    wd = weekdays[dt.weekday()]
+    date_str = dt.strftime("%m-%d")
+    label = "今天" if i == 0 else ("明天" if i == 1 else f"{wd}")
+
+    t_max = t.get("max", 0)
+    t_min = t.get("min", 0)
+    sky = SKYCON_MAP.get(s.get("value", ""), s.get("value", ""))
+    sky_icon = sky.split()[0] if " " in sky else "🌡️"
+
+    line = f"{sky_icon} {label} {date_str} {t_min:.0f}°~{t_max:.0f}° {sky.split()[-1] if ' ' in sky else sky}"
+    return line
+
+
 # 降雨等级（按小时降水强度 mm/h） → 返回 (图标, 映射用的 skycon_key)
 def precip_level(val):
     if val < 0.1:
@@ -407,7 +468,7 @@ def main():
             dt_str = h.get("datetime", "")
             try:
                 h_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-                if h_dt.hour == now.hour:
+                if h_dt.date() == now.date() and h_dt.hour == now.hour:
                     start_idx = idx
                     break
                 elif h_dt > now and start_idx == 0:
@@ -415,79 +476,35 @@ def main():
             except Exception:
                 continue
 
-        # print("⏰ 逐小时预报 | font=PingFangSC size=13")
-        for i in range(start_idx, min(start_idx + 12, len(hourly_temp))):
-            h_temp = hourly_temp[i]
-            h_sky = hourly_skycon[i] if i < len(hourly_skycon) else {}
-            h_precip = hourly_precip[i] if i < len(hourly_precip) else {}
-            h_wind = hourly_wind[i] if i < len(hourly_wind) else {}
-            h_aqi = hourly_aqi[i] if i < len(hourly_aqi) else {}
-
-            dt_str = h_temp.get("datetime", "")
-            try:
-                h_dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M")
-                time_label = h_dt.strftime("%H:%M")
-                if h_dt.hour == now.hour:
-                    time_label = "现在"
-            except Exception:
-                time_label = "--:--"
-
-            temp_val = h_temp.get("value", 0)
-            precip_val = h_precip.get("value", 0)
-            p_icon, p_skycon_key = precip_level(precip_val)
-
-            sky_raw = h_sky.get("value", "")
-            # 如果 API 返回泛化的 RAIN，根据降水量细化成具体等级
-            if sky_raw == "RAIN" and precip_val > 0.05 and p_skycon_key:
-                sky_raw = p_skycon_key
-
-            sky_val = SKYCON_MAP.get(sky_raw, sky_raw)
-            sky_icon = sky_val.split()[0] if " " in sky_val else "🌡️"
-            sky_text = sky_val.split()[-1] if " " in sky_val else sky_val
-            precip_str = f"{p_icon}{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
-            w_spd = h_wind.get("speed", 0)
-            w_dir = wind_direction(h_wind.get("direction", 0))
-            aqi_val = int(h_aqi.get("value", 0) or 0)
-            aqi_icon = "🟢" if aqi_val <= 50 else ("🟡" if aqi_val <= 100 else "🟠")
-
-            parts = [f"{sky_icon} {time_label} {temp_val:.0f}° {sky_text}"]
-            if precip_str:
-                parts.append(precip_str)
-            # parts.append(f"💨{w_dir}{w_spd:.0f}m/s")
-            # parts.append(f"AQI{aqi_icon}{aqi_val}")
-            line = " ".join(parts)
+        hourly_count = len(hourly_temp)
+        direct_hours = 12
+        end_idx = min(start_idx + direct_hours, hourly_count)
+        for i in range(start_idx, end_idx):
+            line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now)
             print(f"{line} | font=PingFangSC size=13 refresh=true")
+
+        # 12 小时以上的更长远期预报，放入可折叠子菜单
+        if end_idx < hourly_count:
+            print("逐小时预报 | font=PingFangSC size=13 refresh=true")
+            for i in range(end_idx, hourly_count):
+                line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now)
+                print(f"-- {line} | font=PingFangSC size=13 refresh=true")
         print("---")
 
     # 未来天级预报
-    # print("📅 未来预报 | font=PingFangSC size=13")
     today = datetime.now()
-    for i in range(min(5, len(daily_temp))):
-        dt = today + timedelta(days=i)
-        wd = weekdays[dt.weekday()]
-        date_str = dt.strftime("%m-%d")
-        label = "今天" if i == 0 else ("明天" if i == 1 else f"{wd}")
-
-        t = daily_temp[i]
-        s = daily_skycon[i] if i < len(daily_skycon) else {}
-        a = daily_aqi[i] if i < len(daily_aqi) else {}
-        w = daily_wind[i] if i < len(daily_wind) else {}
-
-        t_max = t.get("max", 0)
-        t_min = t.get("min", 0)
-        sky = SKYCON_MAP.get(s.get("value", ""), s.get("value", ""))
-        sky_icon = sky.split()[0] if " " in sky else "🌡️"
-        aqi_val = int(a.get("avg", 0) or 0)
-        aqi_lbl = aqi_level(aqi_val).split()[1]
-
-        w_avg = w.get("avg", {})
-        w_spd = w_avg.get("speed", 0)
-        w_dir_val = w_avg.get("direction", 0)
-        w_dir_str = wind_direction(w_dir_val)
-
-        # line = f"{sky_icon} {label}({date_str}) {t_min:.0f}°~{t_max:.0f}° {sky.split()[-1] if ' ' in sky else sky} 风{w_dir_str}{w_spd:.0f}m/s AQI{aqi_val}{aqi_lbl}"
-        line = f"{sky_icon} {label} {date_str} {t_min:.0f}°~{t_max:.0f}° {sky.split()[-1] if ' ' in sky else sky}"
+    daily_count = len(daily_temp)
+    direct_days = 7
+    for i in range(min(direct_days, daily_count)):
+        line = format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today, weekdays)
         print(f"{line} | font=PingFangSC size=13 refresh=true")
+
+    # 更多天级预报放入可折叠子菜单
+    if daily_count > direct_days:
+        print("天级预报 | font=PingFangSC size=13 refresh=true")
+        for i in range(direct_days, daily_count):
+            line = format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today, weekdays)
+            print(f"-- {line} | font=PingFangSC size=13 refresh=true")
 
     print("---")
     print("彩云天气 | href=https://www.caiyunapp.com/h5/ refresh=true")
