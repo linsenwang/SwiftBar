@@ -55,8 +55,8 @@ def _png_chunk(chunk_type, data):
     return struct.pack(">I", len(data)) + chunk + struct.pack(">I", crc)
 
 
-def _encode_png(rgba_pixels, width, height):
-    """纯标准库 PNG 编码器（RGBA 8bit）"""
+def _encode_png(rgba_pixels, width, height, ppi=72):
+    """纯标准库 PNG 编码器（RGBA 8bit），支持通过 pHYs 块设置 PPI"""
     raw = b""
     for y in range(height):
         raw += b"\x00"
@@ -65,9 +65,12 @@ def _encode_png(rgba_pixels, width, height):
     compressed = zlib.compress(raw)
     sig = b"\x89PNG\r\n\x1a\n"
     ihdr = _png_chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 6, 0, 0, 0))
+    # pHYs 块：声明物理像素密度，macOS/SwiftBar 据此按实际尺寸渲染
+    ppm = int(round(ppi / 0.0254))  # pixels per meter
+    phys = _png_chunk(b"pHYs", struct.pack(">IIB", ppm, ppm, 1))
     idat = _png_chunk(b"IDAT", compressed)
     iend = _png_chunk(b"IEND", b"")
-    return sig + ihdr + idat + iend
+    return sig + ihdr + phys + idat + iend
 
 
 def _rain_color(val):
@@ -112,20 +115,24 @@ def render_rain_chart(precip_2h):
     if not precip_2h or len(precip_2h) < 60 or max(precip_2h) < 0.05:
         return None
     # 原始数据最多 120 个分钟级数据点，线性插值到 240 个点
+    CHART_POINTS = 240
+    CHART_HEIGHT = 60
+    SCALE = 2               # 2x 渲染，配合 144 PPI 在 Retina 下更清晰且尺寸不变
     raw = precip_2h[:120]
     values = []
-    for i in range(240):
-        f = i / 239.0 * (len(raw) - 1)
+    for i in range(CHART_POINTS):
+        f = i / (CHART_POINTS - 1.0) * (len(raw) - 1)
         i0 = int(f)
         i1 = min(i0 + 1, len(raw) - 1)
         t = f - i0
         values.append(raw[i0] * (1 - t) + raw[i1] * t)
-    n = len(values)
-    bar_w = 1
+    bar_w = 1 * SCALE
     gap = 0
     pad_left = 0
-    W = 240
-    H = 60
+    pad_bottom = 2 * SCALE
+    usable_h_offset = 8 * SCALE
+    W = CHART_POINTS * SCALE
+    H = CHART_HEIGHT * SCALE
     # 全透明背景
     pixels = [(0, 0, 0, 0)] * (W * H)
     height_threshold = 0.4
@@ -133,25 +140,25 @@ def render_rain_chart(precip_2h):
     for i, val in enumerate(values):
         x0 = pad_left + i * (bar_w + gap)
         x1 = x0 + bar_w
-        bar_h = max(2, int((val / max_val) * (H - 8)))
-        y0 = H - bar_h - 2
-        y1 = H - 2
+        bar_h = max(2 * SCALE, int((val / max_val) * (H - usable_h_offset)))
+        y0 = H - bar_h - pad_bottom
+        y1 = H - pad_bottom
         color = _rain_color(val)
         for y in range(y0, y1):
             for x in range(x0, x1):
                 if 0 <= x < W and 0 <= y < H:
                     pixels[y * W + x] = color
 
-    # 固定阈值横线：0.1mm/h（小雨下限）和 0.5mm/h（小雨上限）
+    # 固定阈值横线：0.1mm/h（小雨下限）和 0.3mm/h
     line_color = (160, 160, 160, 140)
     for threshold in (0.1, 0.3):
         if threshold <= max_val:
-            ly = H - 2 - int((threshold / max_val) * (H - 8))
+            ly = H - pad_bottom - int((threshold / max_val) * (H - usable_h_offset))
             if 0 <= ly < H:
                 for x in range(W):
                     pixels[ly * W + x] = line_color
 
-    png_data = _encode_png(pixels, W, H)
+    png_data = _encode_png(pixels, W, H, ppi=72 * SCALE)
     return base64.b64encode(png_data).decode()
 
 
@@ -358,9 +365,6 @@ def main():
     apparent_temp = rt.get("apparent_temperature", temp)
     uv = rt.get("ultraviolet", {})
     comfort = rt.get("comfort", {})
-    precip = rt.get("precipitation", {})
-    nearest_rain = precip.get("nearest", {})
-    local_rain = precip.get("local", {})
 
     # 分钟级预报
     minutely = result.get("minutely", {})
@@ -407,20 +411,7 @@ def main():
     # print(f"🔽 气压: {rt.get('pres', 0) / 100:.0f}hPa | font=PingFangSC size=13")
     print("---")
 
-    # 降雨信息
-    if local_rain.get("status") == "ok":
-        intensity = local_rain.get("intensity", 0)
-        if intensity > 0:
-            print(f"当前降雨: {intensity:.2f}mm/h | font=PingFangSC size=13 refresh=true")
-        elif nearest_rain.get("status") == "ok":
-            dist = nearest_rain.get("distance", 0)
-            # if dist > 0:
-            #     print(f"☁️ 最近降雨: {dist:.0f}km 外 | font=PingFangSC size=13 refresh=true")
-    # 分钟级降雨趋势（API 不保证始终返回）
-    # if minutely.get("status") == "ok":
-        # m_desc = minutely.get("description", "")
-        # if m_desc:
-        #     print(f"⏱️ {m_desc} | font=PingFangSC size=13 refresh=true")
+
 
     if minutely.get("status") == "ok":
         m_precip_2h = minutely.get("precipitation_2h", [])
