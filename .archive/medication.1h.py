@@ -9,7 +9,7 @@
 SwiftBar 吃药记录插件
 - 菜单栏左侧显示沃克，右侧显示阿莫西林
 - 下拉栏点击 +1 记录吃药，显示已吃数量、整板余数
-- 自动显示 早/中/晚 服用情况
+- 自动显示 早/午/晚 服用情况
 - 一键复制当前情况到剪贴板
 文件名建议：medication.1h.py（每小时自动刷新）
 """
@@ -34,14 +34,14 @@ MEDS = {
     "amxl": {
         "name": "阿莫西林",
         "count": 30,           # 初始已吃数量
-        "schedule": ["早", "中", "晚"],
+        "schedule": ["早", "午", "晚"],
         "mod": 10,
     },
 }
 
 PERIOD_HOURS = {
     "早": (4, 11),
-    "中": (11, 17),
+    "午": (11, 17),
     "晚": (17, 4),  # 跨天：17:00 ~ 次日 04:00
 }
 
@@ -49,7 +49,7 @@ PERIOD_HOURS = {
 DOSE_SEQUENCE = [
     ("wk", "早"),
     ("amxl", "早"),
-    ("amxl", "中"),
+    ("amxl", "午"),
     ("wk", "晚"),
     ("amxl", "晚"),
 ]
@@ -66,11 +66,8 @@ def remaining_slots(count, mod):
 # 状态文件路径
 # ---------------------------------------------------------------------------
 def get_state_path():
-    data_dir = os.environ.get("SWIFTBAR_PLUGIN_DATA_PATH")
-    if data_dir:
-        p = Path(data_dir)
-    else:
-        p = Path(__file__).resolve().parent
+    # 固定存在脚本同目录，方便手动查看/修改
+    p = Path(__file__).resolve().parent
     p.mkdir(parents=True, exist_ok=True)
     return p / STATE_FILE_NAME
 
@@ -121,7 +118,7 @@ def current_period(now=None):
     if 4 <= h < 11:
         return "早", today
     elif 11 <= h < 17:
-        return "中", today
+        return "午", today
     elif 17 <= h < 24:
         return "晚", today
     else:  # 0 <= h < 4，算前一天的晚
@@ -134,7 +131,7 @@ def period_window(ref_date, period):
     if period == "早":
         start = datetime.combine(ref_date, time(4, 0)).replace(tzinfo=tz)
         end = datetime.combine(ref_date, time(11, 0)).replace(tzinfo=tz)
-    elif period == "中":
+    elif period == "午":
         start = datetime.combine(ref_date, time(11, 0)).replace(tzinfo=tz)
         end = datetime.combine(ref_date, time(17, 0)).replace(tzinfo=tz)
     else:  # 晚：17:00 ~ 次日 04:00
@@ -174,26 +171,40 @@ def increment_med(key):
     save_state(state)
 
 
+def next_sequence_dose(state, ref_date):
+    """根据已完成项，返回序列中下一个该吃的项目 (idx, key, period)。"""
+    last_idx = -1
+    for i, (key, period) in enumerate(DOSE_SEQUENCE):
+        doses = state.get(key, {}).get("doses", [])
+        if is_taken_in_period(doses, ref_date, period):
+            last_idx = i
+    n = len(DOSE_SEQUENCE)
+    for offset in range(1, n + 1):
+        idx = (last_idx + offset) % n
+        key, period = DOSE_SEQUENCE[idx]
+        if not is_taken_in_period(state.get(key, {}).get("doses", []), ref_date, period):
+            return idx, key, period
+    # 全部完成，回到下一轮第一个
+    return 0, DOSE_SEQUENCE[0][0], DOSE_SEQUENCE[0][1]
+
+
 def forward_dose():
-    """按 DOSE_SEQUENCE 顺序，把第一个未吃的项目标记为已吃。"""
+    """按 DOSE_SEQUENCE 顺序，把下一个该吃的项目标记为已吃。"""
     state = load_state()
     now = datetime.now().astimezone()
     _, ref_date = current_period(now)
-    for key, period in DOSE_SEQUENCE:
-        doses = state.get(key, {}).get("doses", [])
-        if not is_taken_in_period(doses, ref_date, period):
-            start, _ = period_window(ref_date, period)
-            state[key]["count"] += 1
-            state[key]["doses"].append((start + timedelta(minutes=1)).isoformat())
-            # 只保留最近 90 天
-            cutoff = (now - timedelta(days=90)).isoformat()
-            state[key]["doses"] = [d for d in state[key]["doses"] if d > cutoff]
-            save_state(state)
-            return
+    _, key, period = next_sequence_dose(state, ref_date)
+    start, _ = period_window(ref_date, period)
+    state[key]["count"] += 1
+    state[key]["doses"].append((start + timedelta(minutes=1)).isoformat())
+    # 只保留最近 90 天
+    cutoff = (now - timedelta(days=90)).isoformat()
+    state[key]["doses"] = [d for d in state[key]["doses"] if d > cutoff]
+    save_state(state)
 
 
 def backward_dose():
-    """撤销 DOSE_SEQUENCE 中最后一个已吃的项目。"""
+    """撤销 DOSE_SEQUENCE 午最后一个已吃的项目。"""
     state = load_state()
     now = datetime.now().astimezone()
     _, ref_date = current_period(now)
@@ -271,20 +282,9 @@ def print_menu():
     now = datetime.now().astimezone()
     _, ref_date = current_period(now)
 
-    # 菜单栏标题：只显示序列中最近一个未吃的项目
-    next_dose = None
-    for key, period in DOSE_SEQUENCE:
-        doses = state.get(key, {}).get("doses", [])
-        if not is_taken_in_period(doses, ref_date, period):
-            next_dose = (key, period)
-            break
-    if next_dose:
-        key, period = next_dose
-        title = f"{MEDS[key]['name'][:1]}{period}"
-    else:
-        # 全部完成，显示下一轮第一个
-        key, period = DOSE_SEQUENCE[0]
-        title = f"{MEDS[key]['name'][:1]}{period}"
+    # 菜单栏标题：根据最后一个已完成项，显示序列中下一个该吃的项目
+    _, key, period = next_sequence_dose(state, ref_date)
+    title = f"{MEDS[key]['name'][:1]}{period}"
     print(
         f"{title} | bash=\"{script_path()}\" param1=forward terminal=false "
         f"refresh=true dropdown=false tooltip=点击前进，右键后退"

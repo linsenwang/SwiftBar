@@ -207,7 +207,7 @@ def get_valid_web_token(allow_refresh: bool = True) -> str:
         token = get_web_token()
         # 用轻量接口验证 token
         req = urllib.request.Request(
-            "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStat",
+            "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscription",
             data=b"{}",
             headers={
                 "Authorization": f"Bearer {token}",
@@ -223,8 +223,9 @@ def get_valid_web_token(allow_refresh: bool = True) -> str:
         raise
 
 
-def fetch_subscription_stat(token: str) -> dict:
-    url = "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscriptionStat"
+def fetch_subscription(token: str) -> dict:
+    """获取会员订阅/额度总览，并转换为旧的 subscriptionBalance 兼容格式。"""
+    url = "https://www.kimi.com/apiv2/kimi.gateway.membership.v2.MembershipService/GetSubscription"
     req = urllib.request.Request(
         url,
         data=b"{}",
@@ -234,7 +235,22 @@ def fetch_subscription_stat(token: str) -> dict:
         },
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.load(resp)
+        data = json.load(resp)
+
+    balances = data.get("balances", [])
+    # 优先取全站通用额度（FEATURE_OMNI），否则取第一个订阅类额度
+    balance = next(
+        (b for b in balances if b.get("feature") == "FEATURE_OMNI"),
+        next((b for b in balances if b.get("type") == "SUBSCRIPTION"), {}),
+    )
+    return {
+        "subscriptionBalance": {
+            "amountUsedRatio": balance.get("amountUsedRatio", 0),
+            "expireTime": balance.get("expireTime", ""),
+        },
+        "ratelimitCode5h": {},
+        "ratelimitCode7d": {},
+    }
 
 
 def fetch_balance_actions(token: str, page_token: str = "", page_size: int = 100) -> dict:
@@ -371,7 +387,7 @@ def main():
     monthly_actions = []
     try:
         web_token = get_valid_web_token(allow_refresh=True)
-        monthly_stat = fetch_subscription_stat(web_token)
+        monthly_stat = fetch_subscription(web_token)
         # 获取最近若干条明细（按时间倒序），用于归档；限制页数避免刷新超时
         actions_resp = fetch_balance_actions(web_token, page_size=50)
         monthly_actions = actions_resp.get("actions", [])
