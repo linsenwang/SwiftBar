@@ -140,11 +140,11 @@ def provider_label(provider: str) -> str:
 def print_menu(current: str, models_info: dict):
     script = plugin_path()
     label = short_label(current)
-    print(f"{label} | refresh=true size=13")
+    print(f"{label} | size=13")
     print("---")
     cur_disp = models_info.get(current, (current, ""))[0]
-    print(f"当前: {cur_disp} | refresh=true")
-    print("---")
+    # print(f"当前: {cur_disp} | refresh=true")
+    # print("---")
 
     # 按 provider 分组
     groups = {}
@@ -167,7 +167,7 @@ def print_menu(current: str, models_info: dict):
                 )
 
     print("---")
-    print(f"编辑配置 | bash=nano param1={CONFIG_PATH} terminal=true")
+    print(f"编辑配置 | href=file://{CONFIG_PATH}")
 
 
 def main():
