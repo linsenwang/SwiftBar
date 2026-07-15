@@ -9,9 +9,11 @@
 SwiftBar 插件: 淘宝闪购配送状态监控
 
 功能:
+- 默认暂停，点外卖后手动开启监控
 - 自动查找微信里的淘宝闪购小程序窗口
 - 截图并 OCR 识别当前配送状态
 - 在菜单栏显示最新状态（如“商家已接单”“骑手正在送货”“已送达”等）
+- 订单到达终态（已送达/已取消/配送异常）30 分钟后自动暂停，避免无意义截图
 - 下拉菜单显示完整 OCR 文本和预计送达时间
 
 前置依赖:
@@ -40,6 +42,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import traceback
 from datetime import datetime, timezone, timedelta
@@ -53,6 +56,7 @@ ARCHIVE_DIR = os.path.join(SCRIPT_DIR, ".archive")
 HELPER_BIN = os.path.join(ARCHIVE_DIR, "taobao_flash_window_helper")
 CACHE_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.json")
 LOG_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.log")
+STATE_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status_state.json")
 
 # 窗口查找配置
 WINDOW_KEYWORD = "淘宝闪购"
@@ -62,6 +66,12 @@ WINDOW_OWNER = "WeChat"  # 留空则不限制应用
 TESSERACT_LANG = "chi_sim+eng"
 # SwiftBar 运行时的 PATH 可能不包含 /opt/homebrew/bin，直接使用绝对路径
 TESSERACT_BIN = "/opt/homebrew/bin/tesseract"
+
+# 运行控制配置
+# 订单到达终态（已送达/已取消/配送异常）后，过多久自动暂停监控（分钟）
+AUTO_PAUSE_AFTER_MINUTES = 30
+# 终态列表
+TERMINAL_STATUSES = {"已送达", "已取消", "配送异常"}
 
 # 配送状态关键词（按优先级排序，越靠前越优先展示）
 # 注意：这里匹配的是去除空格后的紧凑文本
@@ -106,6 +116,51 @@ def log_debug(msg: str) -> None:
             f.write(f"[{now}] {msg}\n")
     except Exception:
         pass
+
+
+def load_state() -> dict:
+    """加载启停状态。默认未启用（避免无外卖时一直截图）。"""
+    if not os.path.exists(STATE_PATH):
+        return {"enabled": False, "completed_at": ""}
+    try:
+        with open(STATE_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {"enabled": False, "completed_at": ""}
+
+
+def save_state(state: dict) -> None:
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+    with open(STATE_PATH, "w", encoding="utf-8") as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+def toggle_enabled() -> bool:
+    """切换启用状态，用于菜单手动启停。手动开启时清除旧订单完成时间。"""
+    state = load_state()
+    new_enabled = not state.get("enabled", False)
+    state["enabled"] = new_enabled
+    if new_enabled:
+        # 新一次监控开始，清除旧订单的完成时间，避免立刻被自动暂停
+        state["completed_at"] = ""
+    save_state(state)
+    return new_enabled
+
+
+def maybe_auto_pause(state: dict) -> dict:
+    """如果订单已到达终态超过设定时间，自动暂停监控。"""
+    completed_at = state.get("completed_at", "")
+    if not completed_at:
+        return state
+    try:
+        completed_dt = datetime.fromisoformat(completed_at)
+        if datetime.now(BJT) - completed_dt > timedelta(minutes=AUTO_PAUSE_AFTER_MINUTES):
+            state["enabled"] = False
+            log_debug("auto-paused after terminal status")
+    except Exception:
+        pass
+    return state
+
 
 def ensure_helper() -> bool:
     """确保窗口查找辅助程序已编译。"""
@@ -249,6 +304,23 @@ def format_menu_title(status: str, eta: str, distance: str) -> str:
 
 
 def main():
+    state = load_state()
+    state = maybe_auto_pause(state)
+
+    # 菜单里始终提供启停开关
+    toggle_label = "暂停监控" if state.get("enabled", False) else "开启监控"
+
+    if not state.get("enabled", False):
+        # 暂停状态：不截图、不 OCR，菜单栏保持极简
+        print(f"🛒 | refresh=true size=13")
+        print("---")
+        print("外卖监控已暂停 | font=PingFangSC size=13 refresh=true")
+        print(f"{toggle_label} | refresh=true terminal=false bash={__file__} param1=--toggle")
+        print("---")
+        print(f"查看日志 | bash=/usr/bin/open param1={LOG_PATH} terminal=false")
+        save_state(state)
+        return
+
     cache = load_cache()
     error_msg = ""
     window_found = False
@@ -283,7 +355,6 @@ def main():
         log_debug(f"extracted: status={status!r}, eta={eta!r}, distance={distance!r}")
 
         # 只有成功提取到状态时才更新缓存和时间戳
-        # 这样可以避免 OCR 识别失败或窗口显示无状态页面时冲掉有效缓存
         if status:
             cache = {
                 "status": status,
@@ -295,6 +366,12 @@ def main():
             }
             save_cache(cache)
             log_debug("cache updated")
+
+            # 到达终态时记录完成时间，用于自动暂停
+            if status in TERMINAL_STATUSES:
+                state["completed_at"] = datetime.now(BJT).isoformat()
+            else:
+                state["completed_at"] = ""
         else:
             # 截图成功但无法识别状态：保留原缓存
             log_debug("no status extracted, falling back to cache")
@@ -312,6 +389,8 @@ def main():
         distance = cache.get("distance", "")
         ocr_text = cache.get("ocr_text", "")
         window_title = cache.get("window_title", "")
+
+    save_state(state)
 
     # 菜单栏标题
     title = format_menu_title(status, eta, distance)
@@ -348,6 +427,7 @@ def main():
         print(f"⚠️ {error_msg} | color=red font=PingFangSC size=13 refresh=true")
 
     print("---")
+    print(f"{toggle_label} | refresh=true terminal=false bash={__file__} param1=--toggle")
     print("刷新 | refresh=true terminal=false")
 
     # 完整 OCR 原文（折叠子菜单）
@@ -364,4 +444,7 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) > 1 and sys.argv[1] == "--toggle":
+        toggle_enabled()
+    else:
+        main()
