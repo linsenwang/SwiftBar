@@ -30,6 +30,9 @@ import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
 
+# 北京时间 (UTC+8)
+BJT = timezone(timedelta(hours=8))
+
 # ---------------------------------------------------------------------------
 # 配置
 # ---------------------------------------------------------------------------
@@ -96,8 +99,8 @@ def load_balance_log() -> list[dict]:
 def append_balance_log(balance: float) -> None:
     """仅在余额变化时追加一条记录。"""
     os.makedirs(ARCHIVE_DIR, exist_ok=True)
-    now = datetime.now(timezone.utc)
-    now_str = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    now = datetime.now(BJT)
+    now_str = now.strftime("%Y-%m-%dT%H:%M:%S+08:00")
 
     # 读上一条记录，余额相同则跳过
     prev_balance = None
@@ -138,7 +141,7 @@ def calc_spending(records: list[dict], since: datetime) -> float:
 
 def get_daily_spending(records: list[dict]) -> list[tuple[str, float]]:
     """计算近 N 天每日花费，返回 [(label, amount), ...]"""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(BJT)
     today = now.strftime("%Y-%m-%d")
     result = []
 
@@ -172,8 +175,6 @@ def fmt_cny(val: float) -> str:
 
 
 def fmt_cny_small(val: float) -> str:
-    if val < 0.01:
-        return f"{val:.4f}"
     return f"{val:.2f}"
 
 
@@ -210,7 +211,7 @@ def main():
     records = load_balance_log()
 
     # 计算花费
-    now = datetime.now(timezone.utc)
+    now = datetime.now(BJT)
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
@@ -221,7 +222,7 @@ def main():
     # 每日花费明细
     daily = get_daily_spending(records)
 
-    # ---- 菜单栏标题：只显示今日花费 ----
+    # ---- 菜单栏标题：显示今日花费 ----
     print(f"{fmt_cny_small(today_spent)} | refresh=true size=13")
     print("---")
 
@@ -238,6 +239,7 @@ def main():
             print(f"{label} {fmt_cny_small(spent)} | font=Menlo size=13 refresh=true")
     print("---")
 
+    print(f"{fmt_cny(balance)} | font=Menlo size=13 refresh=true")
     print("DeepSeek Platform | href=https://platform.deepseek.com/usage")
     print(f"刷新 | refresh=true terminal=false bash={__file__}")
 

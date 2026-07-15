@@ -514,16 +514,20 @@ def main():
             except Exception:
                 monthly_expire = expire_time
 
-    title = f"W {w_display} H {h_display}"
-    if diff_display:
-        title += f" {diff_display}%"
+    # 周配额已用完 → 只显示 W 重置时间，隐藏 H 及差值（反正超配额用不了）
+    if w_ratio >= 1:
+        title = f"W {w_display}"
+    else:
+        title = f"W {w_display} H {h_display}"
+        if diff_display:
+            title += f" {diff_display}%"
     print(f"{title} | refresh=true size=13")
     print("---")
 
     # 下拉菜单详情
     if reset_time:
         print(f"{format_reset_time(reset_time)} | refresh=true font=Menlo size=13")
-    if min300_reset:
+    if min300_reset and w_ratio < 1:
         h_disp = format_reset_time(min300_reset)
         if min300_diff_display:
             h_disp += f" {min300_diff_display}"
