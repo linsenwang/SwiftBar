@@ -223,23 +223,23 @@ def main():
     daily = get_daily_spending(records)
 
     # ---- 菜单栏标题：显示今日花费 ----
-    print(f"{fmt_cny_small(today_spent)} | refresh=true size=13")
+    print(f"{fmt_cny_small(today_spent)} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 花费汇总（无 emoji）
-    print(f"M {fmt_cny(month_spent)} | font=PingFangSC size=13 refresh=true")
-    print(f"7D {fmt_cny(seven_days_spent)} | font=PingFangSC size=13 refresh=true")
+    print(f"M {fmt_cny(month_spent)} | font='Sarasa Mono SC' size=13 refresh=true")
+    print(f"7D {fmt_cny(seven_days_spent)} | font='Sarasa Mono SC' size=13 refresh=true")
     print("---")
 
     # ---- 近5日每日花费（不折叠）----
     for label, spent in daily:
         if spent == 0:
-            print(f"{label} 无花费 | font=Menlo size=13 color=#888888 refresh=true")
+            print(f"{label} 无花费 | font='Sarasa Mono SC' size=13 color=#888888 refresh=true")
         else:
-            print(f"{label} {fmt_cny_small(spent)} | font=Menlo size=13 refresh=true")
+            print(f"{label} {fmt_cny_small(spent)} | font='Sarasa Mono SC' size=13 refresh=true")
     print("---")
 
-    print(f"{fmt_cny(balance)} | font=Menlo size=13 refresh=true")
+    print(f"{fmt_cny(balance)} | font='Sarasa Mono SC' size=13 refresh=true")
     print("DeepSeek Platform | href=https://platform.deepseek.com/usage")
     print(f"刷新 | refresh=true terminal=false bash={__file__}")
 

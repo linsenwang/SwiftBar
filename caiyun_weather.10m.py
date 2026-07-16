@@ -208,7 +208,8 @@ def format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind
     sky_val = SKYCON_MAP.get(sky_raw, sky_raw)
     sky_icon = sky_val.split()[0] if " " in sky_val else "🌡️"
     sky_text = sky_val.split()[-1] if " " in sky_val else sky_val
-    precip_str = f"{p_icon}{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
+    # precip_str = f"{p_icon}{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
+    precip_str = f"{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
 
     # 无雨且要求显示体感温度时，计算并追加体感温度
     no_rain = precip_val < 0.05
@@ -300,9 +301,9 @@ SKYCON_MAP = {
     "PARTLY_CLOUDY_DAY": "⛅ 多云",
     "PARTLY_CLOUDY_NIGHT": "🌤️ 多云",
     "CLOUDY": "☁️ 阴",
-    "LIGHT_RAIN": "🌧️ 小雨",
-    "MODERATE_RAIN": "🌧️ 中雨",
-    "HEAVY_RAIN": "⛈️ 大雨",
+    "LIGHT_RAIN": "💧 小雨",
+    "MODERATE_RAIN": "💦 中雨",
+    "HEAVY_RAIN": "🌧️ 大雨",
     "STORM_RAIN": "⛈️ 暴雨",
     "LIGHT_SNOW": "🌨️ 小雪",
     "MODERATE_SNOW": "🌨️ 中雪",
@@ -313,6 +314,26 @@ SKYCON_MAP = {
     "HAZE": "😷 霾",
     "RAIN": "🌧️ 雨",
 }
+
+# SKYCON_MAP = {
+#     "CLEAR_DAY": "晴",
+#     "CLEAR_NIGHT": "晴",
+#     "PARTLY_CLOUDY_DAY": "多云",
+#     "PARTLY_CLOUDY_NIGHT": "多云",
+#     "CLOUDY": "阴",
+#     "LIGHT_RAIN": "小雨",
+#     "MODERATE_RAIN": "中雨",
+#     "HEAVY_RAIN": "大雨",
+#     "STORM_RAIN": "暴雨",
+#     "LIGHT_SNOW": "小雪",
+#     "MODERATE_SNOW": "中雪",
+#     "HEAVY_SNOW": "大雪",
+#     "STORM_SNOW": "暴雪",
+#     "WIND": "大风",
+#     "FOG": "雾",
+#     "HAZE": "霾",
+#     "RAIN": "雨",
+# }
 
 # AQI 等级映射
 def aqi_level(aqi):
@@ -432,11 +453,12 @@ def main():
     # title_icon = skycon.split()[0] if " " in skycon else "🌡️"
     # title_icon = skycon.split()[1] if " " in skycon else ""
     title_icon = skycon.replace(' ', '')
-    print(f"{title_icon}  {temp:.1f}°C | refresh=true size=13")
+    # print(f"{title_icon}  {temp:.1f}°C | font='Sarasa Mono SC' refresh=true size=13")
+    print(f"{title_icon} {temp:.1f} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 数据更新时间
-    print(f"更新于 {update_str} | font=PingFangSC size=13 refresh=true")
+    print(f"更新于 {update_str} | font='Sarasa Mono SC' size=13 refresh=true")
     print("---")
 
     # 预报摘要
@@ -444,16 +466,16 @@ def main():
         cleaned_forecast_keypoint = re.sub(r'呢|最近的|吧|~|哦|您|还是|把', '', forecast_keypoint)
         forecast_keypoint_list = cleaned_forecast_keypoint.split('，')
         for lines in forecast_keypoint_list:
-            print(f"{lines} | font=PingFangSC size=13 refresh=true")
+            print(f"{lines} | font='Sarasa Mono SC' size=13 refresh=true")
         print("---")
 
     # 实时天气
-    print(f"🌡️ 温度 {temp:.1f}°C  体感 {apparent_temp:.1f}°C | font=PingFangSC size=13 refresh=true")
-    # print(f"🌤️ 天气状况: {skycon} | font=PingFangSC size=13")
-    print(f"相对湿度: {humidity}% | font=PingFangSC size=13 refresh=true")
-    # print(f"💨 风向风速: {wind_dir}风 {wind_speed:.1f}m/s ({wind_desc(wind_speed)}) | font=PingFangSC size=13")
-    # print(f"👁️ 能见度: {rt.get('visibility', 0):.1f}km | font=PingFangSC size=13")
-    # print(f"🔽 气压: {rt.get('pres', 0) / 100:.0f}hPa | font=PingFangSC size=13")
+    print(f"🌡️ 温度 {temp:.1f}°C  体感 {apparent_temp:.1f}°C | font='Sarasa Mono SC' size=13 refresh=true")
+    # print(f"🌤️ 天气状况: {skycon} | font='Sarasa Mono SC' size=13")
+    print(f"相对湿度: {humidity}% | font='Sarasa Mono SC' size=13 refresh=true")
+    # print(f"💨 风向风速: {wind_dir}风 {wind_speed:.1f}m/s ({wind_desc(wind_speed)}) | font='Sarasa Mono SC' size=13")
+    # print(f"👁️ 能见度: {rt.get('visibility', 0):.1f}km | font='Sarasa Mono SC' size=13")
+    # print(f"🔽 气压: {rt.get('pres', 0) / 100:.0f}hPa | font='Sarasa Mono SC' size=13")
     print("---")
 
 
@@ -462,7 +484,7 @@ def main():
         m_precip_2h = minutely.get("precipitation_2h", [])
         chart_b64 = render_rain_chart(m_precip_2h)
         if chart_b64:
-            # print(f"📊 未来2h降雨趋势 | font=PingFangSC size=13 refresh=true")
+            # print(f"📊 未来2h降雨趋势 | font='Sarasa Mono SC' size=13 refresh=true")
             print(f" | image={chart_b64} refresh=true")
 
     print("---")
@@ -474,7 +496,7 @@ def main():
     # no2 = rt.get("no2", 0)
     # so2 = rt.get("so2", 0)
     # co = rt.get("co", 0)
-    # print(f"🫁 AQI: {aqi} {aqi_text} | font=PingFangSC size=13")
+    # print(f"🫁 AQI: {aqi} {aqi_text} | font='Sarasa Mono SC' size=13")
     # print(f"   PM2.5: {pm25}  PM10: {pm10}  O₃: {o3} | font=Menlo size=13 color=#888888 refresh=true")
     # print(f"   NO₂: {no2}  SO₂: {so2}  CO: {co} | font=Menlo size=13 color=#888888 refresh=true")
     # print("---")
@@ -485,9 +507,9 @@ def main():
     # uv_desc = uv.get("desc", "")
     # comfort_desc = comfort.get("desc", "")
     # if uv_desc:
-    #     print(f"☀️ 紫外线: {uv_desc} (指数{uv_index}) | font=PingFangSC size=13")
+    #     print(f"☀️ 紫外线: {uv_desc} (指数{uv_index}) | font='Sarasa Mono SC' size=13")
     # if comfort_desc:
-    #     print(f"😌 舒适度: {comfort_desc} | font=PingFangSC size=13")
+    #     print(f"😌 舒适度: {comfort_desc} | font='Sarasa Mono SC' size=13")
     # if uv_desc or comfort_desc:
     #     print("---")
 
@@ -520,15 +542,15 @@ def main():
             show_apparent = (i - start_idx) < 5
             line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
                                       hourly_humidity, show_apparent)
-            print(f"{line} | font=PingFangSC size=13 refresh=true")
+            print(f"{line} | font='Sarasa Mono SC' size=13 refresh=true")
 
         # 12 小时以上的更长远期预报，放入可折叠子菜单
         if end_idx < hourly_count:
-            print("逐小时预报 | font=PingFangSC size=13 refresh=true")
+            print("逐小时预报 | font='Sarasa Mono SC' size=13 refresh=true")
             for i in range(end_idx, hourly_count):
                 line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
                                           hourly_humidity, show_apparent=False)
-                print(f"-- {line} | font=PingFangSC size=13 refresh=true")
+                print(f"-- {line} | font='Sarasa Mono SC' size=13 refresh=true")
         print("---")
 
     # 未来天级预报
@@ -537,14 +559,14 @@ def main():
     direct_days = 7
     for i in range(min(direct_days, daily_count)):
         line = format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today, weekdays)
-        print(f"{line} | font=PingFangSC size=13 refresh=true")
+        print(f"{line} | font='Sarasa Mono SC' size=13 refresh=true")
 
     # 更多天级预报放入可折叠子菜单
     if daily_count > direct_days:
-        print("天级预报 | font=PingFangSC size=13 refresh=true")
+        print("天级预报 | font='Sarasa Mono SC' size=13 refresh=true")
         for i in range(direct_days, daily_count):
             line = format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today, weekdays)
-            print(f"-- {line} | font=PingFangSC size=13 refresh=true")
+            print(f"-- {line} | font='Sarasa Mono SC' size=13 refresh=true")
 
     print("---")
     print("彩云天气 | href=https://www.caiyunapp.com/h5/ refresh=true")

@@ -1,0 +1,332 @@
+import Cocoa
+import os
+import Preferences
+import UserNotifications
+
+#if MAC_APP_STORE
+    protocol SPUStandardUserDriverDelegate {}
+    protocol SPUUpdaterDelegate {}
+#else
+    import Sparkle
+#endif
+
+func parseUserShell(from output: String) -> String? {
+    for line in output.split(separator: "\n") {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("UserShell:") else { continue }
+
+        let shell = trimmed.replacingOccurrences(of: "UserShell:", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
+        return shell.isEmpty ? nil : shell
+    }
+
+    return nil
+}
+
+func statusItemVisibilityKeys(in defaults: [String: Any]) -> [String] {
+    defaults.keys.filter { $0.hasPrefix("NSStatusItem Visible") }.sorted()
+}
+
+@discardableResult
+func removeStatusItemVisibilityKeys(userDefaults: UserDefaults = .standard) -> [String] {
+    let keysToRemove = statusItemVisibilityKeys(in: userDefaults.dictionaryRepresentation())
+
+    for key in keysToRemove {
+        userDefaults.removeObject(forKey: key)
+    }
+
+    if !keysToRemove.isEmpty {
+        userDefaults.synchronize()
+    }
+
+    return keysToRemove
+}
+
+func shouldImportOpenedPluginFile(at url: URL, makePluginExecutable: Bool, fileManager: FileManager = .default) -> Bool {
+    guard url.isFileURL else {
+        return false
+    }
+
+    var isDirectory: ObjCBool = false
+    guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else {
+        return false
+    }
+
+    if isDirectory.boolValue {
+        return url.isSwiftBarPackage && PackagedPlugin.findMainExecutable(in: url) != nil
+    }
+
+    return shouldLoadPluginFile(at: url, makePluginExecutable: makePluginExecutable, fileManager: fileManager)
+}
+
+class AppDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverDelegate, SPUUpdaterDelegate, UNUserNotificationCenterDelegate, NSWindowDelegate {
+    var repositoryWindowController: NSWindowController? {
+        didSet {
+            repositoryWindowController?.window?.delegate = self
+        }
+    }
+
+    lazy var preferencesWindowController = PreferencesWindowController(
+        panes: preferencePanes,
+        style: .toolbarItems,
+        animated: false
+    )
+
+    var repositoryToolbarSearchItem: NSToolbarItem?
+
+    var pluginManager: PluginManager!
+    let prefs = PreferencesStore.shared
+    let sharedEnv = Environment.shared
+    #if !MAC_APP_STORE
+        var softwareUpdater: SPUUpdater!
+    #endif
+
+    /// True when SwiftBar is hosting an XCTest / Swift Testing bundle.
+    /// Set by the test runner via the `XCTestConfigurationFilePath` env var.
+    static var isRunningTests: Bool {
+        ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil ||
+            NSClassFromString("XCTestCase") != nil
+    }
+
+    func applicationDidFinishLaunching(_: Notification) {
+        // Wire up the plugin manager so tests that reference
+        // `delegate.pluginManager` have a usable instance, then bail out before
+        // touching anything that keeps the runloop alive (Sparkle, the
+        // missing-folder modal, file-system observers). Without this the test
+        // host never reaches application termination and the test process hangs
+        // indefinitely after the last @Test finishes.
+        pluginManager = PluginManager.shared
+        if Self.isRunningTests { return }
+
+        preferencesWindowController.window?.delegate = self
+        setupToolbar()
+
+        // Clean up any corrupted NSStatusItem visibility states from UserDefaults
+        // This fixes issues where menubar items disappear after initial setup
+        cleanupStatusItemVisibility()
+
+        let hostBundle = Bundle.main
+        #if !MAC_APP_STORE
+            let updateDriver = SPUStandardUserDriver(hostBundle: hostBundle, delegate: self)
+            softwareUpdater = SPUUpdater(hostBundle: hostBundle, applicationBundle: hostBundle, userDriver: updateDriver, delegate: self)
+
+            do {
+                try softwareUpdater.start()
+            } catch {
+                NSLog("Failed to start software updater with error: \(error)")
+            }
+        #endif
+
+        setDefaultShelf()
+        // Check if plugin folder exists
+        var isDir: ObjCBool = false
+        if let pluginDirectoryPath = prefs.pluginDirectoryResolvedPath,
+           !FileManager.default.fileExists(atPath: pluginDirectoryPath, isDirectory: &isDir) || !isDir.boolValue
+        {
+            prefs.pluginDirectoryPath = nil
+        }
+
+        pluginManager.loadPlugins()
+        pluginManager.persistLatestSystemReport(reason: "application-did-finish-launching")
+
+        while PreferencesStore.shared.pluginDirectoryPath == nil {
+            let alert = NSAlert()
+            alert.messageText = Localizable.App.ChoosePluginFolderMessage.localized
+            alert.informativeText = Localizable.App.ChoosePluginFolderInfo.localized
+            alert.addButton(withTitle: Localizable.App.OKButton.localized)
+            alert.addButton(withTitle: Localizable.App.Quit.localized)
+            let modalResult = alert.runModal()
+
+            switch modalResult {
+            case .alertFirstButtonReturn:
+                AppShared.changePluginFolder()
+            default:
+                NSApplication.shared.terminate(self)
+            }
+        }
+
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willSleepNotification,
+                                                          object: nil,
+                                                          queue: OperationQueue.main)
+        { [weak self] _ in
+            os_log("Mac is going to sleep", log: Log.plugin, type: .info)
+            self?.sharedEnv.updateSleepTime(date: NSDate.now)
+            self?.pluginManager.terminateAllPlugins()
+        }
+
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification,
+                                                          object: nil,
+                                                          queue: OperationQueue.main)
+        { [weak self] _ in
+            os_log("Mac waked up", log: Log.plugin, type: .info)
+            self?.sharedEnv.updateWakeTime(date: NSDate.now)
+            // Start plugins with respect to their schedules
+            self?.pluginManager.startAllPlugins()
+        }
+    }
+
+    func setDefaultShelf() {
+        if let shell = ProcessInfo.processInfo.environment["SHELL"],
+           shell.hasPrefix("/"),
+           FileManager.default.isExecutableFile(atPath: shell)
+        {
+            sharedEnv.userLoginShell = shell
+            return
+        }
+
+        let out = try? runScript(to: "/usr/bin/dscl", args: [".", "-read", "/Users/\(NSUserName())", "UserShell"], runInBash: false)
+        if let output = out?.out,
+           let shell = parseUserShell(from: output),
+           shell.hasPrefix("/")
+        {
+            sharedEnv.userLoginShell = shell
+            return
+        }
+
+        os_log("Failed to determine user login shell, using default: %{public}@", log: Log.plugin, type: .error, sharedEnv.userLoginShell)
+    }
+
+    func changePresentationType() {
+        if preferencesWindowController.window?.isVisible != true && repositoryWindowController?.window?.isVisible != true {
+            NSApp.setActivationPolicy(.accessory)
+            return
+        }
+
+        if preferencesWindowController.window != nil || repositoryWindowController?.window != nil {
+            NSApp.setActivationPolicy(.regular)
+            return
+        }
+    }
+
+    func applicationWillTerminate(_: Notification) {
+        pluginManager.terminateAllPlugins()
+    }
+
+    func getPluginFromURL(url: URL) -> Plugin? {
+        guard let identifier = url.queryParameters?["plugin"] ?? url.queryParameters?["name"] else { return nil }
+        return pluginManager.getPluginByNameOrID(identifier: identifier)
+    }
+
+    func feedURLString(for _: SPUUpdater) -> String? {
+        if prefs.includeBetaUpdates {
+            return "https://swiftbar.github.io/SwiftBar/appcast-beta.xml"
+        }
+        return "https://swiftbar.github.io/SwiftBar/appcast.xml"
+    }
+
+    func application(_: NSApplication, open urls: [URL]) {
+        for url in urls {
+            if shouldImportOpenedPluginFile(at: url, makePluginExecutable: prefs.makePluginExecutable) {
+                pluginManager.importPlugin(from: url)
+                continue
+            }
+
+            switch url.host?.lowercased() {
+            case "refreshallplugins":
+                pluginManager.refreshAllPlugins(reason: .RefreshAllURLScheme)
+            case "refreshplugin":
+                if let plugin = getPluginFromURL(url: url) {
+                    pluginManager.menuBarItems[plugin.id]?.dimOnManualRefresh()
+                    if let params = url.queryParameters {
+                        plugin.refreshEnv = params.filter { $0.key != "name" }
+                    }
+                    plugin.refresh(reason: .URLScheme)
+                    return
+                }
+                if let indexStr = url.queryParameters?["index"], let index = Int(indexStr) {
+                    pluginManager.refreshPlugin(with: index, reason: .URLScheme)
+                    return
+                }
+            case "disableplugin":
+                if let plugin = getPluginFromURL(url: url) {
+                    pluginManager.disablePlugin(plugin: plugin)
+                }
+            case "enableplugin":
+                if let plugin = getPluginFromURL(url: url) {
+                    pluginManager.enablePlugin(plugin: plugin)
+                }
+            case "toggleplugin":
+                if let plugin = getPluginFromURL(url: url) {
+                    pluginManager.togglePlugin(plugin: plugin)
+                }
+            case "addplugin":
+                if let src = url.queryParameters?["src"], let url = URL(string: src) {
+                    pluginManager.importPlugin(from: url)
+                }
+            case "setephemeralplugin":
+                if let name = url.queryParameters?["name"],
+                   case let pluginContent = url.queryParameters?["content"] ?? "",
+                   let exitAfter = Double(url.queryParameters?["exitafter"] ?? "0")
+                {
+                    pluginManager.setEphemeralPlugin(pluginId: name, content: pluginContent, exitAfter: exitAfter)
+                }
+            case "notify":
+                guard let plugin = getPluginFromURL(url: url) else { return }
+                let paramsString = url.queryParameters?.map { "\($0.key)=\($0.value.escaped())" }.joined(separator: " ") ?? ""
+                pluginManager.showNotification(plugin: plugin,
+                                               title: url.queryParameters?["title"]?.replacingOccurrences(of: "+", with: " "),
+                                               subtitle: url.queryParameters?["subtitle"]?.replacingOccurrences(of: "+", with: " "),
+                                               body: url.queryParameters?["body"]?.replacingOccurrences(of: "+", with: " "),
+                                               href: url.queryParameters?["href"],
+                                               commandParams: MenuLineParameters(line: "|\(paramsString)").json,
+                                               silent: url.queryParameters?["silent"] == "true")
+            case "copysystemreport":
+                pluginManager.copyLatestSystemReportToPasteboard()
+            case "opensystemreport":
+                pluginManager.openLatestSystemReport()
+            default:
+                os_log("Unsupported URL scheme \n %{public}@", log: Log.plugin, type: .error, url.absoluteString)
+            }
+        }
+    }
+
+    func userNotificationCenter(_: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+        let payload = response.notification.request.content.userInfo
+
+        guard let pluginID = payload[SystemNotificationName.pluginID] as? String,
+              let plugin = pluginManager.plugins.first(where: { $0.id == pluginID }),
+              plugin.enabled else { return }
+
+        if let urlString = payload[SystemNotificationName.url] as? String,
+           let url = URL(string: urlString)
+        {
+            NSWorkspace.shared.open(url)
+        }
+
+        if let commandString = payload[SystemNotificationName.command] as? String,
+           let json = commandString.data(using: .utf8), let params = MenuLineParameters(json: json),
+           let bash = params.bash
+        {
+            AppShared.runInTerminal(script: bash, args: params.bashParams, runInBackground: !params.terminal,
+                                    env: plugin.env, runInBash: plugin.metadata?.shouldRunInBash ?? true)
+            {
+                if params.refresh {
+                    plugin.refresh(reason: .NotificationAction)
+                }
+            }
+        }
+
+        completionHandler()
+    }
+
+    func windowWillClose(_: Notification) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.changePresentationType()
+        }
+    }
+    
+    /// Removes `NSStatusItem Visible` keys from UserDefaults on launch.
+    ///
+    /// MenubarItem sets `autosaveName` so macOS persists Preferred Position keys
+    /// (preserving the user's menu bar ordering). As a side effect, macOS also
+    /// creates `NSStatusItem Visible` keys which can incorrectly hide items
+    /// when plugins have no output or fail to load. We clear those keys at launch
+    /// while keeping Preferred Position keys intact.
+    private func cleanupStatusItemVisibility() {
+        // Clear visibility persistence while keeping Preferred Position keys so user ordering survives restarts.
+        let keysToRemove = removeStatusItemVisibilityKeys()
+        
+        for key in keysToRemove {
+            os_log("Removed NSStatusItem persistence key: %{public}@", log: Log.plugin, type: .info, key)
+        }
+    }
+}

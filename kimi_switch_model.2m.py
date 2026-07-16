@@ -140,7 +140,7 @@ def provider_label(provider: str) -> str:
 def print_menu(current: str, models_info: dict):
     script = plugin_path()
     label = short_label(current)
-    print(f"{label} | size=13")
+    print(f"{label} | font='Sarasa Mono SC' size=13")
     print("---")
     cur_disp = models_info.get(current, (current, ""))[0]
     # print(f"当前: {cur_disp} | refresh=true")
@@ -158,34 +158,34 @@ def print_menu(current: str, models_info: dict):
         first_group = False
         for key, disp_name in items:
             if key == current:
-                print(f"✓ {disp_name} | refresh=true")
+                print(f"✓ {disp_name} | font='Sarasa Mono SC' refresh=true")
             else:
                 print(
-                    f"{disp_name} | bash={sys.executable} "
+                    f"{disp_name} | font='Sarasa Mono SC' bash={sys.executable} "
                     f"param1={script} param2=--switch param3={key} "
                     f"terminal=false refresh=true"
                 )
 
     print("---")
-    print(f"编辑配置 | href=file://{CONFIG_PATH}")
+    print(f"编辑配置 | font='Sarasa Mono SC' href=file://{CONFIG_PATH}")
 
 
 def main():
     try:
         current, models_info = read_config()
     except FileNotFoundError:
-        print("⚙? | refresh=true")
+        print("⚙? | font='Sarasa Mono SC' refresh=true")
         print("---")
         print(f"未找到 {CONFIG_PATH} | color=red")
         return
     except Exception as e:
-        print("⚙? | refresh=true")
+        print("⚙? | font='Sarasa Mono SC' refresh=true")
         print("---")
         print(f"读取配置失败: {e} | color=red")
         return
 
     if not models_info:
-        print("⚙? | refresh=true")
+        print("⚙? | font='Sarasa Mono SC' refresh=true")
         print("---")
         print("配置文件中未定义 [models.*] 节 | color=red")
         return

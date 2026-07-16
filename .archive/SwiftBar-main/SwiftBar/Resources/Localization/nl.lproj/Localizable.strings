@@ -1,0 +1,112 @@
+//Menubar strings
+"MB_SWIFT_BAR" = "SwiftBar";
+"MB_UPDATING_MENU" = "Bijwerken…";
+"MB_LAST_UPDATED" = "Bijgewerkt";
+"MB_ABOUT_SWIFT_BAR" = "Over";
+"MB_ABOUT_PLUGIN" = "Over";
+"MB_RUN_IN_TERMINAL" = "Voer uit in Terminal";
+"MB_DISABLE_PLUGIN" = "Schakel plug-in uit";
+"MB_DDEBUG_PLUGIN" = "Debug plug-in";
+"MB_TERMINATE_EPH" = "Terminate Plugin";
+"MB_PREFERENCES" = "Voorkeuren…";
+"MB_REFRESH_ALL" = "Ververs alle plug-ins";
+"MB_ENABLE_ALL" = "Schakel alle in";
+"MB_DISABLE_ALL" = "Schakel alle uit";
+"MB_OPEN_PLUGINS_FOLDER" = "Open map voor plug-ins";
+"MB_CHANGE_PLUGINS_FOLDER" = "Wijzig map voor plug-ins…";
+"MB_GET_PLUGINS" = "Plug-ins verkrijgen…";
+"MB_SEND_FEEDBACK" = "Stuur feedback…";
+"MB_SHOW_ERROR" = "Toon foutmelding";
+"MB_COPY_SYSTEM_REPORT" = "Copy System Report";
+"MB_OPEN_SYSTEM_REPORT" = "Open System Report...";
+
+//Preferences strings
+"PF_PREFERENCES" = "Voorkeuren";
+"PF_GENERAL" = "Algemeen";
+"PF_ADVANCED" = "Advanced";
+"PF_PLUGINS" = "Plug-ins";
+"PF_SHORTCUT_PLUGINS" = "Shortcut Plugins";
+"PF_ABOUT" = "About";
+"PF_PLUGINS_FOLDER" = "Map voor plug-ins";
+"PR_LAUNCH_AT_LOGIN" = "Opstarten bij inloggen";
+"PF_PATH" = "Pad";
+"PF_PATH_IS_NONE" = "Geen";
+"PF_CHANGE_PATH" = "Wijzig…";
+"PF_SHELL" = "Shell";
+"PF_TERMINAL" = "Shell-applicatie";
+"PF_HIDE_SWIFTBAR_ICON" = "Verberg SwiftBar-icoon";
+"PF_STEALTH_MODE" = "Hide SwiftBar in the menu bar";
+"PF_CHECK_FOR_UPDATE" = "Updates";
+"PF_CHECK_FOR_UPDATES" = "Controleer op updates…";
+"PR_INCLUDE_BETA_UPDATES" = "Pre-releaseversies Opnemen";
+"PR_SHARE_CRASH_REPORTS" = "Crashrapporten delen";
+"PF_NO_PLUGINS_MESSAGE" = "Plug-insmap is leeg";
+"PF_ENABLE_ALL" = "Alle plug-ins inschakelen";
+"PF_PLUGINS_FOOTNOTE" = "Ingeschakelde plug-ins verschijnen in de menubalk.";
+"PF_MENUBAR_ITEM" = "Menu Bar Item";
+"PF_DIM_ON_MANUAL_REFRESH" = "Dim on Manual Refresh";
+"PF_SHORTCUTS_COLUMN_NAME" = "Name";
+"PF_SHORTCUTS_COLUMN_SHORTCUT" = "Shortcut";
+"PF_SHORTCUTS_COLUMN_REFRESH" = "Refresh";
+"PF_SHORTCUTS_DELETE_BUTTON" = "Delete";
+"PF_SHORTCUTS_DELETE_CONFIRMATION" = "Are you sure you want to delete '<selectedPlugin>'?";
+"PF_SHORTCUTS_ADD_BUTTON" = "Add";
+"PF_SHORTCUTS_COLUMN_TOGGLE_HELP" = "Enable\Disable menu bar item";
+"PF_SHORTCUTS_COLUMN_REFRESH_HELP" = "Refresh menu bar item";
+"PF_ADD_SHORTCUT_PLUGIN_HEADER" = "Add Shortcut Plugin";
+"PF_ADD_SHORTCUT_PLUGIN_NAME" = "Name";
+"PF_ADD_SHORTCUT_PLUGIN_FOLDER" = "Folder";
+"PF_ADD_SHORTCUT_PLUGIN_SHORTCUT" = "Shortcut";
+"PF_ADD_SHORTCUT_PLUGIN_REFRESH_HELP" = "Refresh Shortcuts list";
+"PF_ADD_SHORTCUT_PLUGIN_OPEN_HELP" = "Open in Shortcuts.app";
+"PF_ADD_SHORTCUT_PLUGIN_NEW_HELP" = "Create new Shortcut";
+"PF_ADD_SHORTCUT_PLUGIN_REFRESH_INTERVAL" = "Refresh Interval";
+
+//Plugin Repository strings
+"PR_CATEGORY" = "Categorie";
+"PR_PLUGIN_REPOSITORY" = "Plug-inverzameling";
+"PR_REFRESHING_DATA_MESSAGE" = "Verversen verzamelingsgegevens…";
+"PR_DEPENDENCIES" = "Afhankelijkheden";
+"PR_PLUGIN_SOURCE" = "Bron";
+"PR_ABOUT_PLUGIN" = "Over";
+"PR_AUTORH_PREPOSITION" = "door";
+"PR_INSTALL_STATUS_INSTALL" = "Installeer";
+"PR_INSTALL_STATUS_INSTALLED" = "Geïnstalleerd";
+"PR_INSTALL_STATUS_FAILED" = "Mislukt";
+"PR_INSTALL_STATUS_DOWNLOADING" = "Downloaden…";
+
+
+//App strings
+"APP_CHOOSE_PLUGIN_FOLDER_TITLE" = "Kies map voor plug-ins";
+"APP_FOLDER_NOT_ALLOWED_MESSAGE" = "Deze map kan niet gebruikt worden voor SwiftBar plug-ins";
+"APP_FOLDER_NOT_ALLOWED_ACTION" = "Kies een andere map";
+"APP_FOLDER_HAS_TOO_MANY_FILES_MESSAGE" = "Wauw! De map die je hebt gekozen bevat heel veel bestanden. Kies een andere map, alsjeblieft. Als je een map genaamd 'node_modules' hebt die vereist is voor een plug-in, verberg die dan.";
+"APP_CHOOSE_PLUGIN_FOLDER_MESSAGE" = "Kies een locatie voor SwiftBar plug-ins";
+"APP_CHOOSE_PLUGIN_FOLDER_INFO" = "Selecteer een map voor de plug-inverzameling";
+"APP_QUIT" = "Stop SwiftBar";
+"OK" = "OK";
+"CANCEL" = "Annuleer";
+
+// Plugin Repository Categories
+"CAT_AWS" = "AWS";
+"CAT_CRYPTOCURRENCY" = "Cryptovaluta";
+"CAT_DEV" = "Ontwikkelaar";
+"CAT_E-COMMERCE" = "E-commerce";
+"CAT_EMAIL" = "E-mail";
+"CAT_ENVIRONMENT" = "Natuur";
+"CAT_FINANCE" = "Financiën";
+"CAT_GAMES" = "Games";
+"CAT_LIFESTYLE" = "Lifestyle";
+"CAT_MESSENGER" = "Messenger";
+"CAT_MUSIC" = "Muziek";
+"CAT_NETWORK" = "Netwerk";
+"CAT_POLITICS" = "Politiek";
+"CAT_SCIENCE" = "Wetenschap";
+"CAT_SPORTS" = "Sport";
+"CAT_SYSTEM" = "Systeem";
+"CAT_TIME" = "Tijd";
+"CAT_TOOLS" = "Tools";
+"CAT_TRAVEL" = "Reizen";
+"CAT_TUTORIAL" = "Tutorial";
+"CAT_WEATHER" = "Weer";
+"CAT_WEB" = "Web";

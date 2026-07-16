@@ -1,0 +1,244 @@
+import Combine
+import Foundation
+import os
+
+/// Update interval value that effectively means "never refresh automatically".
+/// Used as the default for plugins that are not on a timed schedule.
+let pluginNeverUpdateInterval: Double = 60 * 60 * 24 * 100
+
+enum PluginType: String {
+    case Executable
+    case Streamable
+    case Shortcut
+    case Ephemeral
+
+    static var debugable: [Self] {
+        [.Executable, .Streamable]
+    }
+
+    static var runnableInTerminal: [Self] {
+        [.Executable, .Streamable]
+    }
+
+    static var disableable: [Self] {
+        [.Executable, .Streamable, .Shortcut]
+    }
+}
+
+enum PluginState {
+    case Loading
+    case Streaming
+    case Success
+    case Failed
+    case Disabled
+}
+
+enum PluginRefreshReason: String {
+    case FirstLaunch
+    case Schedule
+    case MenuAction
+    case RefreshAllMenu
+    case RefreshAllURLScheme
+    case URLScheme
+    case Shortcut
+    case DebugView
+    case NotificationAction
+    case PluginSettings
+    case MenuOpen
+    case WakeFromSleep
+
+    static func manualReasons() -> [Self] {
+        [
+            .MenuAction,
+            .RefreshAllMenu,
+            .RefreshAllURLScheme,
+            .URLScheme,
+            .Shortcut,
+            .NotificationAction,
+            .PluginSettings,
+            .DebugView,
+            .MenuOpen,
+        ]
+    }
+}
+
+typealias PluginID = String
+
+protocol Plugin: AnyObject {
+    var id: PluginID { get }
+    var type: PluginType { get }
+    var name: String { get }
+    var file: String { get }
+    var enabled: Bool { get }
+    var metadata: PluginMetadata? { get set }
+    var contentUpdatePublisher: PassthroughSubject<String?, Never> { get set }
+    var updateInterval: Double { get }
+    var lastUpdated: Date? { get set }
+    var lastState: PluginState { get set }
+    var lastRefreshReason: PluginRefreshReason { get set }
+    var content: String? { get set }
+    var error: Error? { get set }
+    var debugInfo: PluginDebugInfo { get set }
+    var refreshEnv: [String: String] { get set }
+    func refresh(reason: PluginRefreshReason)
+    func enable()
+    func disable()
+    func start()
+    func terminate()
+    func invoke() -> String?
+    func makeScriptExecutable(file: String)
+    func refreshPluginMetadata()
+    func writeStdin(_ input: String) throws
+}
+
+/// A plugin that manages its own refresh timer.
+///
+/// Conforming types can be generically re-armed by `RunPluginOperation`
+/// after each invocation, without the caller knowing the concrete plugin type.
+protocol TimerArmingPlugin: Plugin {
+    var timerGeneration: UInt { get set }
+    var timerArmingEnabled: Bool { get set }
+    func enableTimer()
+}
+
+extension TimerArmingPlugin {
+    func beginTimerArmingCycle() {
+        timerArmingEnabled = true
+        timerGeneration &+= 1
+    }
+
+    func stopTimerArming() {
+        timerArmingEnabled = false
+        timerGeneration &+= 1
+    }
+}
+
+extension Plugin {
+    var description: String {
+        """
+        id: \(id)
+        type: \(type)
+        name: \(name)
+        path: \(file)
+        """
+    }
+
+    var isStale: Bool {
+        // Check if plugin has timed updates and hasn't updated within 2x the interval
+        guard updateInterval > 0,
+              updateInterval < pluginNeverUpdateInterval,
+              let lastUpdated
+        else {
+            return false
+        }
+
+        let timeSinceLastUpdate = Date().timeIntervalSince(lastUpdated)
+        return timeSinceLastUpdate > (updateInterval * 2)
+    }
+
+    var prefs: PreferencesStore {
+        PreferencesStore.shared
+    }
+
+    var enabled: Bool {
+        !prefs.disabledPlugins.contains(id)
+    }
+
+    func makeScriptExecutable(file: String) {
+        guard prefs.makePluginExecutable else { return }
+        _ = try? runScript(to: "chmod", args: ["+x", "\(file.escaped())"])
+    }
+
+    func refreshPluginMetadata() {
+        os_log("Refreshing plugin metadata \n%{public}@", log: Log.plugin, file)
+        let url = URL(fileURLWithPath: file)
+
+        // Parse metadata in a thread-safe way
+        var newMetadata: PluginMetadata?
+        var scriptVariables: [PluginVariable] = []
+
+        // Always parse from script first to get variables (they're only defined in the script)
+        if let script = try? String(contentsOf: url) {
+            let scriptMetadata = PluginMetadata.parser(script: script)
+            newMetadata = scriptMetadata
+            scriptVariables = scriptMetadata.variables
+        }
+
+        // If there's metadata in extended attributes, use it but preserve variables from script
+        if let md = PluginMetadata.parser(fileURL: url) {
+            md.variables = scriptVariables
+            newMetadata = md
+        }
+
+        // Only update if we got new metadata
+        if let newMetadata = newMetadata {
+            metadata = newMetadata
+
+            // Update refresh environment if needed
+            if !newMetadata.environment.isEmpty {
+                refreshEnv = newMetadata.environment
+            }
+        }
+    }
+
+    var cacheDirectory: URL? {
+        AppShared.cacheDirectory?.appendingPathComponent(id)
+    }
+
+    var cacheDirectoryPath: String {
+        cacheDirectory?.path ?? ""
+    }
+
+    var dataDirectory: URL? {
+        AppShared.dataDirectory?.appendingPathComponent(id)
+    }
+
+    var dataDirectoryPath: String {
+        dataDirectory?.path ?? ""
+    }
+
+    func createSupportDirs() {
+        if let cacheURL = cacheDirectory {
+            try? FileManager.default.createDirectory(at: cacheURL, withIntermediateDirectories: true, attributes: nil)
+        }
+        if let dataURL = dataDirectory {
+            try? FileManager.default.createDirectory(at: dataURL, withIntermediateDirectories: true, attributes: nil)
+        }
+    }
+
+    var env: [String: String] {
+        var pluginEnv = [
+            Environment.Variables.swiftBarPluginPath.rawValue: file,
+            Environment.Variables.osAppearance.rawValue: AppShared.isDarkTheme ? "Dark" : "Light",
+            Environment.Variables.swiftBarPluginCachePath.rawValue: cacheDirectoryPath,
+            Environment.Variables.swiftBarPluginDataPath.rawValue: dataDirectoryPath,
+            Environment.Variables.swiftBarPluginRefreshReason.rawValue: lastRefreshReason.rawValue,
+        ]
+
+        // Add metadata environment (contains defaults from script parsing)
+        metadata?.environment.forEach { k, v in
+            pluginEnv[k] = v
+        }
+
+        // Add refreshEnv (from swiftbar.environment tag, may overlap with xbar.var defaults)
+        for (k, v) in refreshEnv {
+            pluginEnv[k] = v
+        }
+        refreshEnv.removeAll()
+
+        // Add xbar.var variables LAST - user values must take final precedence
+        if let variables = metadata?.variables, !variables.isEmpty {
+            let userValues = PluginVariableStorage.loadUserValues(pluginFile: file)
+            let varEnv = PluginVariableStorage.buildEnvironment(variables: variables, userValues: userValues)
+            for (k, v) in varEnv {
+                pluginEnv[k] = v
+            }
+        }
+
+        return pluginEnv
+    }
+
+    func writeStdin(_ input: String) throws {
+        throw NSError(domain: "SwiftBar.Plugin", code: 1, userInfo: [NSLocalizedDescriptionKey: "Plugin type \(type.rawValue) does not support stdin input"])
+    }
+}

@@ -521,17 +521,17 @@ def main():
         title = f"W {w_display} H {h_display}"
         if diff_display:
             title += f" {diff_display}%"
-    print(f"{title} | refresh=true size=13")
+    print(f"{title} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 下拉菜单详情
     if reset_time:
-        print(f"{format_reset_time(reset_time)} | refresh=true font=Menlo size=13")
+        print(f"{format_reset_time(reset_time)} | refresh=true font='Sarasa Mono SC' size=13")
     if min300_reset and w_ratio < 1:
         h_disp = format_reset_time(min300_reset)
         if min300_diff_display:
             h_disp += f" {min300_diff_display}"
-        print(f"{h_disp} | refresh=true font=Menlo size=13")
+        print(f"{h_disp} | refresh=true font='Sarasa Mono SC' size=13")
     if monthly_display:
         m_line = monthly_expire
         if monthly_expire:
@@ -540,7 +540,7 @@ def main():
             m_line = monthly_display
         if monthly_diff_display:
             m_line += f" {monthly_diff_display}"
-        print(f"{m_line} | refresh=true font=Menlo size=13")
+        print(f"{m_line} | refresh=true font='Sarasa Mono SC' size=13")
     print("---")
 
     if monthly_error:

@@ -82,7 +82,7 @@ STATUS_PATTERNS = [
     ("已取消", r"订单已取消|已取消"),
     ("配送异常", r"配送异常|订单异常|配送失败"),
     ("已送达", r"已送达|订单已完成|送达成功"),
-    ("配送中", r"骑[手士]正在为你送[货餐]|正在为你送[货餐]|正在送[货餐]|配送中|正在配送"),
+    ("配送中", r"骑[手士]正在为你送[货餐]|正在为你送[货餐]|正在送[货餐]|按序送货|配送中|正在配送"),
     ("骑手已取货", r"骑[手士]已取[货餐]|骑[手士]已到店"),
     ("骑手已接单", r"骑[手士]已接单|骑[手士]正赶往商家|骑[手士]正在赶往商家|骑[手士]赶往商家|骑[手士]接单"),
     ("商家备货中", r"商家备货中|商家正在备[餐餐]|正在备[餐餐]|备货中"),
@@ -106,6 +106,15 @@ DISTANCE_PATTERNS = [
     r"距商[家冢]\s*([0-9.]+)\s*[公里kmKM]",
     r"大约?\s*(\d+)\s*分钟",
     r"(\d+)\s*分钟后?送达",
+]
+
+# 前方剩余单数模式
+ORDER_COUNT_PATTERNS = [
+    r"前方剩余\s*(\d+)\s*单",
+    r"剩余\s*(\d+)\s*单",
+    r"前面还有\s*(\d+)\s*单",
+    r"还有\s*(\d+)\s*单",
+    r"当前第\s*(\d+)\s*单",
 ]
 
 BJT = timezone(timedelta(hours=8))
@@ -296,6 +305,17 @@ def extract_distance(text: str) -> str:
     return ""
 
 
+def extract_order_count(text: str) -> str:
+    """从 OCR 文本中提取前方剩余单数。"""
+    compact = _compact(text)
+    for pattern in ORDER_COUNT_PATTERNS:
+        m = re.search(pattern, compact)
+        if m:
+            count = m.group(1)
+            return f"剩{count}单"
+    return ""
+
+
 def load_cache() -> dict:
     if not os.path.exists(CACHE_PATH):
         return {}
@@ -312,16 +332,19 @@ def save_cache(data: dict) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def format_menu_title(status: str, eta: str, distance: str) -> str:
-    """生成菜单栏标题，保持简洁。"""
+def format_menu_title(status: str, eta: str, distance: str, order_count: str) -> str:
+    """生成菜单栏标题，保持简洁。优先级：距离 > 单数 > 预计时间。
+    有具体状态时不再显示购物车图标，只有未识别/暂停时才显示图标用于点击。"""
     if status:
-        title = f"🛒 {status}"
+        title = status
     else:
         title = "🛒 未识别"
 
     extras = []
     if distance:
         extras.append(distance)
+    elif order_count:
+        extras.append(order_count)
     elif eta:
         extras.append(eta)
 
@@ -339,9 +362,9 @@ def main():
 
     if not state.get("enabled", False):
         # 暂停状态：不截图、不 OCR，菜单栏保持极简
-        print(f"🛒 | refresh=true size=13")
+        print(f"🛒 | font='Sarasa Mono SC' refresh=true size=13")
         print("---")
-        print("外卖监控已暂停 | font=PingFangSC size=13 refresh=true")
+        print("外卖监控已暂停 | font='Sarasa Mono SC' size=13 refresh=true")
         print(f"{toggle_label} | refresh=true terminal=false bash={__file__} param1=--toggle")
         print("---")
         print(f"查看日志 | bash=/usr/bin/open param1={LOG_PATH} terminal=false")
@@ -356,6 +379,7 @@ def main():
     status = ""
     eta = ""
     distance = ""
+    order_count = ""
     window_title = ""
 
     try:
@@ -379,7 +403,8 @@ def main():
         status = extract_status(ocr_text)
         eta = extract_eta(ocr_text)
         distance = extract_distance(ocr_text)
-        log_debug(f"extracted: status={status!r}, eta={eta!r}, distance={distance!r}")
+        order_count = extract_order_count(ocr_text)
+        log_debug(f"extracted: status={status!r}, eta={eta!r}, distance={distance!r}, order_count={order_count!r}")
 
         # 只有成功提取到状态时才更新缓存和时间戳
         if status:
@@ -387,6 +412,7 @@ def main():
                 "status": status,
                 "eta": eta,
                 "distance": distance,
+                "order_count": order_count,
                 "window_title": window_title,
                 "ocr_text": ocr_text,
                 "updated_at": datetime.now(BJT).isoformat(),
@@ -405,6 +431,7 @@ def main():
             status = cache.get("status", "")
             eta = cache.get("eta", "")
             distance = cache.get("distance", "")
+            order_count = cache.get("order_count", "")
             error_msg = "未从当前截图中识别到配送状态"
     except Exception as e:
         error_msg = str(e)
@@ -414,44 +441,47 @@ def main():
         status = cache.get("status", "")
         eta = cache.get("eta", "")
         distance = cache.get("distance", "")
+        order_count = cache.get("order_count", "")
         ocr_text = cache.get("ocr_text", "")
         window_title = cache.get("window_title", "")
 
     save_state(state)
 
     # 菜单栏标题
-    title = format_menu_title(status, eta, distance)
+    title = format_menu_title(status, eta, distance, order_count)
     if error_msg and not status:
         title = "🛒 未找到窗口"
-    print(f"{title} | refresh=true size=13")
+    print(f"{title} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 下拉详情
     if status:
-        print(f"状态: {status} | font=PingFangSC size=13 refresh=true")
+        print(f"状态: {status} | font='Sarasa Mono SC' size=13 refresh=true")
     if eta:
-        print(f"预计: {eta} | font=PingFangSC size=13 refresh=true")
+        print(f"预计: {eta} | font='Sarasa Mono SC' size=13 refresh=true")
     if distance:
-        print(f"距离: {distance} | font=PingFangSC size=13 refresh=true")
+        print(f"距离: {distance} | font='Sarasa Mono SC' size=13 refresh=true")
+    if order_count:
+        print(f"单数: {order_count} | font='Sarasa Mono SC' size=13 refresh=true")
 
     updated_at = cache.get("updated_at", "")
     if updated_at:
         try:
             dt = datetime.fromisoformat(updated_at)
             time_str = dt.strftime("%H:%M")
-            print(f"更新于 {time_str} | font=Menlo size=12 color=#888888 refresh=true")
+            print(f"更新于 {time_str} | font='Sarasa Mono SC' size=12 color=#888888 refresh=true")
         except Exception:
             pass
 
     if window_title:
-        print(f"窗口: {window_title} | font=Menlo size=12 color=#888888 refresh=true")
+        print(f"窗口: {window_title} | font='Sarasa Mono SC' size=12 color=#888888 refresh=true")
 
     if from_cache:
-        print("窗口未在前台，显示缓存状态 | font=PingFangSC size=12 color=#888888 refresh=true")
+        print("窗口未在前台，显示缓存状态 | font='Sarasa Mono SC' size=12 color=#888888 refresh=true")
     elif window_found and error_msg:
-        print(f"{error_msg} | color=#888888 font=PingFangSC size=12 refresh=true")
+        print(f"{error_msg} | color=#888888 font='Sarasa Mono SC' size=12 refresh=true")
     elif error_msg:
-        print(f"⚠️ {error_msg} | color=red font=PingFangSC size=13 refresh=true")
+        print(f"⚠️ {error_msg} | color=red font='Sarasa Mono SC' size=13 refresh=true")
 
     print("---")
     print(f"{toggle_label} | refresh=true terminal=false bash={__file__} param1=--toggle")
@@ -459,12 +489,12 @@ def main():
 
     # 完整 OCR 原文（折叠子菜单）
     if ocr_text:
-        print("OCR 原文 | font=PingFangSC size=13 refresh=true")
+        print("OCR 原文 | font='Sarasa Mono SC' size=13 refresh=true")
         for line in ocr_text.splitlines():
             line = line.strip()
             if line:
                 # SwiftBar 子菜单以 -- 开头
-                print(f"-- {line} | font=Menlo size=12 refresh=true")
+                print(f"-- {line} | font='Sarasa Mono SC' size=12 refresh=true")
 
     print("---")
     print(f"查看日志 | bash=/usr/bin/open param1={LOG_PATH} terminal=false")
