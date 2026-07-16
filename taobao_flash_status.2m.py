@@ -17,8 +17,8 @@ SwiftBar 插件: 淘宝闪购配送状态监控
 - 下拉菜单显示完整 OCR 文本和预计送达时间
 
 前置依赖:
-- tesseract (brew install tesseract tesseract-lang)
-- Swift 编译器 (Xcode Command Line Tools，用于编译窗口查找辅助程序)
+- tesseract (brew install tesseract tesseract-lang) —— Vision OCR 失败时的兜底
+- Swift 编译器 (Xcode Command Line Tools，用于编译辅助程序)
 
 安装:
 1. 安装 SwiftBar: https://github.com/swiftbar/SwiftBar/releases
@@ -26,11 +26,12 @@ SwiftBar 插件: 淘宝闪购配送状态监控
    cp taobao_flash_status.2m.py "$HOME/Library/Application Support/SwiftBar/plugins/"
 3. 将辅助源码放到 .archive 目录（避免被 SwiftBar 识别成插件）:
    mkdir -p "$HOME/Library/Application Support/SwiftBar/plugins/.archive"
-   cp taobao_flash_window_helper.swift \
+   cp taobao_flash_window_helper.swift taobao_flash_ocr_helper.swift \
      "$HOME/Library/Application Support/SwiftBar/plugins/.archive/"
 4. 编译辅助程序:
    cd "$HOME/Library/Application Support/SwiftBar/plugins/.archive/"
    swiftc -O taobao_flash_window_helper.swift -o taobao_flash_window_helper
+   swiftc -O taobao_flash_ocr_helper.swift -o taobao_flash_ocr_helper
 5. 确保主插件可执行:
    chmod +x "$HOME/Library/Application Support/SwiftBar/plugins/taobao_flash_status.2m.py"
 6. SwiftBar 会自动识别并显示在菜单栏
@@ -54,6 +55,7 @@ from typing import Optional
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ARCHIVE_DIR = os.path.join(SCRIPT_DIR, ".archive")
 HELPER_BIN = os.path.join(ARCHIVE_DIR, "taobao_flash_window_helper")
+OCR_HELPER_BIN = os.path.join(ARCHIVE_DIR, "taobao_flash_ocr_helper")
 CACHE_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.json")
 LOG_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.log")
 STATE_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status_state.json")
@@ -63,8 +65,8 @@ WINDOW_KEYWORD = "淘宝闪购"
 WINDOW_OWNER = "WeChat"  # 留空则不限制应用
 
 # OCR 配置
+# 主 OCR 使用 macOS Vision 框架（识别率远高于 tesseract），失败时回退到 tesseract
 TESSERACT_LANG = "chi_sim+eng"
-# SwiftBar 运行时的 PATH 可能不包含 /opt/homebrew/bin，直接使用绝对路径
 TESSERACT_BIN = "/opt/homebrew/bin/tesseract"
 
 # 运行控制配置
@@ -75,20 +77,24 @@ TERMINAL_STATUSES = {"已送达", "已取消", "配送异常"}
 
 # 配送状态关键词（按优先级排序，越靠前越优先展示）
 # 注意：这里匹配的是去除空格后的紧凑文本
+# 原则：越接近配送完成、越代表当前动作的状态优先级越高
 STATUS_PATTERNS = [
     ("已取消", r"订单已取消|已取消"),
     ("配送异常", r"配送异常|订单异常|配送失败"),
     ("已送达", r"已送达|订单已完成|送达成功"),
     ("配送中", r"骑[手士]正在为你送[货餐]|正在为你送[货餐]|正在送[货餐]|配送中|正在配送"),
-    ("骑手已取货", r"骑[手士]已取[货餐]|骑[手士]已到店|骑[手士]已接单"),
+    ("骑手已取货", r"骑[手士]已取[货餐]|骑[手士]已到店"),
+    ("骑手已接单", r"骑[手士]已接单|骑[手士]正赶往商家|骑[手士]正在赶往商家|骑[手士]赶往商家|骑[手士]接单"),
     ("商家备货中", r"商家备货中|商家正在备[餐餐]|正在备[餐餐]|备货中"),
     ("商家已接单", r"商家已接单|商家已确认|已接单"),
+    ("已预约", r"已预约|预约订单|预约中|预约配送|预约送达|指定时间|预计明天|预约时间"),
     ("待付款", r"待付款|待支付|请尽快支付"),
 ]
 
 # 预计送达时间模式（捕获组内为要展示的时间文本）
 ETA_PATTERNS = [
-    r"(?:预计|预)?\s*(\d{1,2}[：:]\d{2}\s*[-~]\s*\d{1,2}[：:]\d{2})",
+    r"(?:预计|预|预约时间)?\s*(\d{1,2}[：:]\d{2}\s*[-~]\s*\d{1,2}[：:]\d{2})",
+    r"(?:预计|预|预约)?\s*(今天|明天|后天|\d{2}-\d{2})?\s*(\d{1,2}[：:]\d{2})",
     r"(?:预计|预)?\s*(\d{1,2}[：:]\d{2})",
 ]
 
@@ -96,6 +102,8 @@ ETA_PATTERNS = [
 DISTANCE_PATTERNS = [
     r"距你\s*([0-9Oo]+)\s*[米mM]",
     r"距你\s*([0-9.]+)\s*[公里kmKM]",
+    r"距商[家冢]\s*([0-9Oo]+)\s*[米mM]",
+    r"距商[家冢]\s*([0-9.]+)\s*[公里kmKM]",
     r"大约?\s*(\d+)\s*分钟",
     r"(\d+)\s*分钟后?送达",
 ]
@@ -201,18 +209,17 @@ def find_window() -> Optional[dict]:
 
 
 def capture_window(window_id: int, output_path: str) -> None:
-    """截图指定窗口（不包含阴影）。"""
+    """截图指定窗口（不包含阴影、不播放声音）。"""
     subprocess.run(
-        ["screencapture", "-l", str(window_id), "-o", output_path],
+        ["screencapture", "-x", "-l", str(window_id), "-o", output_path],
         check=True,
         capture_output=True,
         timeout=15,
     )
 
 
-def ocr_image(image_path: str) -> str:
-    """使用 tesseract OCR 识别图片文字。"""
-    # tesseract 在当前环境下对绝对路径读取异常，改用临时目录 + 相对路径执行
+def ocr_with_tesseract(image_path: str) -> str:
+    """tesseract OCR 兜底方案。"""
     with tempfile.TemporaryDirectory() as tmpdir:
         rel_img = os.path.join(tmpdir, "img.png")
         os.symlink(os.path.abspath(image_path), rel_img)
@@ -230,6 +237,25 @@ def ocr_image(image_path: str) -> str:
         out_path = os.path.join(tmpdir, "out.txt")
         with open(out_path, "r", encoding="utf-8") as f:
             return f.read()
+
+
+def ocr_image(image_path: str) -> str:
+    """使用 macOS Vision 框架 OCR，失败时回退到 tesseract。"""
+    if os.path.exists(OCR_HELPER_BIN):
+        proc = subprocess.run(
+            [OCR_HELPER_BIN, image_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        if proc.returncode == 0 and proc.stdout.strip():
+            log_debug(f"vision ocr succeeded, length={len(proc.stdout)}")
+            return proc.stdout
+        log_debug(f"vision ocr failed or empty: rc={proc.returncode}, stderr={proc.stderr!r}")
+    else:
+        log_debug("vision ocr helper not found, falling back to tesseract")
+
+    return ocr_with_tesseract(image_path)
 
 
 def _compact(text: str) -> str:
@@ -252,7 +278,8 @@ def extract_eta(text: str) -> str:
     for pattern in ETA_PATTERNS:
         m = re.search(pattern, compact)
         if m:
-            return m.group(1).replace(" ", "")
+            parts = [g for g in m.groups() if g]
+            return "".join(parts).replace(" ", "")
     return ""
 
 
@@ -263,8 +290,8 @@ def extract_distance(text: str) -> str:
         m = re.search(pattern, compact)
         if m:
             raw = m.group(0)
-            # 清理并简化显示，把 OCR 误识别的大写 O 还原为 0
-            raw = raw.replace(" ", "").replace("距你", "").replace("O", "0").replace("o", "0")
+            # 清理并简化显示：O->0，冢->家
+            raw = raw.replace(" ", "").replace("距你", "").replace("O", "0").replace("o", "0").replace("冢", "家")
             return raw
     return ""
 

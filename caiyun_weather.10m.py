@@ -174,13 +174,15 @@ def render_rain_ansi(precip_2h):
     return bars
 
 
-def format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now):
+def format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
+                       hourly_humidity=None, show_apparent=False):
     """格式化单条逐小时预报行"""
     h_temp = hourly_temp[i]
     h_sky = hourly_skycon[i] if i < len(hourly_skycon) else {}
     h_precip = hourly_precip[i] if i < len(hourly_precip) else {}
     h_wind = hourly_wind[i] if i < len(hourly_wind) else {}
     h_aqi = hourly_aqi[i] if i < len(hourly_aqi) else {}
+    h_humidity = hourly_humidity[i] if hourly_humidity and i < len(hourly_humidity) else {}
 
     dt_str = h_temp.get("datetime", "")
     try:
@@ -208,7 +210,22 @@ def format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind
     sky_text = sky_val.split()[-1] if " " in sky_val else sky_val
     precip_str = f"{p_icon}{precip_val:.1f}mm" if precip_val > 0.05 and p_icon else ""
 
-    parts = [f"{sky_icon} {time_label} {temp_val:.0f}° {sky_text}"]
+    # 无雨且要求显示体感温度时，计算并追加体感温度
+    no_rain = precip_val < 0.05
+    apparent_str = ""
+    if show_apparent and no_rain:
+        at = apparent_temperature(
+            temp_val,
+            h_humidity.get("value"),
+            h_wind.get("speed", 0),
+        )
+        if at is not None:
+            apparent_str = f"{at:.1f}°"
+
+    parts = [f"{sky_icon} {time_label} {temp_val:.1f}°"]
+    if apparent_str:
+        parts.append(apparent_str)
+    parts.append(sky_text)
     if precip_str:
         parts.append(precip_str)
     return " ".join(parts)
@@ -236,6 +253,33 @@ def format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today,
 
 
 # 降雨等级（按小时降水强度 mm/h） → 返回 (图标, 映射用的 skycon_key)
+def apparent_temperature(temp_c, humidity_frac, wind_speed_ms):
+    """估算体感温度。
+
+    高温时参考中国气象部门常用的湿度修正（高湿闷热，风速降温弱）；
+    低温时使用标准风寒公式；中间温度平滑过渡。
+    """
+    import math
+    try:
+        rh = max(0.0, min(1.0, float(humidity_frac))) * 100.0  # 转成百分比
+        t = float(temp_c)
+        ws = max(0.0, float(wind_speed_ms))
+    except (TypeError, ValueError):
+        return None
+
+    if t >= 26:
+        # 高温高湿：湿度越高越闷热
+        at = t + 0.07 * (rh - 50)
+    elif t <= 10:
+        # 低温：风寒效应（标准风冷公式，单位 °C / m/s）
+        at = 13.12 + 0.6215 * t - 11.37 * (ws ** 0.16) + 0.3965 * t * (ws ** 0.16)
+    else:
+        # 过渡区：湿度影响随温度线性减弱
+        humidity_factor = (t - 10) / 16.0
+        at = t + 0.07 * (rh - 50) * humidity_factor
+    return at
+
+
 def precip_level(val):
     if val < 0.1:
         return "", ""
@@ -376,6 +420,7 @@ def main():
     hourly_precip = hourly.get("precipitation", [])
     hourly_wind = hourly.get("wind", [])
     hourly_aqi = hourly.get("aqi", [])
+    hourly_humidity = hourly.get("humidity", [])
 
     # 未来3天预报
     daily_temp = daily.get("temperature", [])
@@ -471,14 +516,18 @@ def main():
         direct_hours = 12
         end_idx = min(start_idx + direct_hours, hourly_count)
         for i in range(start_idx, end_idx):
-            line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now)
+            # 仅当前 5 小时且无雨时显示体感温度
+            show_apparent = (i - start_idx) < 5
+            line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
+                                      hourly_humidity, show_apparent)
             print(f"{line} | font=PingFangSC size=13 refresh=true")
 
         # 12 小时以上的更长远期预报，放入可折叠子菜单
         if end_idx < hourly_count:
             print("逐小时预报 | font=PingFangSC size=13 refresh=true")
             for i in range(end_idx, hourly_count):
-                line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now)
+                line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
+                                          hourly_humidity, show_apparent=False)
                 print(f"-- {line} | font=PingFangSC size=13 refresh=true")
         print("---")
 

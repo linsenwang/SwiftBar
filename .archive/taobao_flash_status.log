@@ -167,3 +167,222 @@
 [2026-07-15 18:09:18] ocr length=419
 [2026-07-15 18:09:18] extracted: status='已送达', eta='', distance=''
 [2026-07-15 18:09:18] cache updated
+[2026-07-15 18:39:39] auto-paused after terminal status
+[2026-07-15 18:44:56] auto-paused after terminal status
+[2026-07-15 18:45:54] auto-paused after terminal status
+[2026-07-15 18:53:20] auto-paused after terminal status
+[2026-07-15 18:55:20] auto-paused after terminal status
+[2026-07-15 18:56:27] auto-paused after terminal status
+[2026-07-15 18:59:20] auto-paused after terminal status
+[2026-07-15 19:00:28] auto-paused after terminal status
+[2026-07-15 20:48:02] auto-paused after terminal status
+[2026-07-15 21:30:07] auto-paused after terminal status
+[2026-07-15 22:43:32] auto-paused after terminal status
+[2026-07-15 22:44:02] auto-paused after terminal status
+[2026-07-15 22:46:02] auto-paused after terminal status
+[2026-07-15 22:48:02] auto-paused after terminal status
+[2026-07-15 22:50:02] auto-paused after terminal status
+[2026-07-15 22:52:02] auto-paused after terminal status
+[2026-07-15 22:54:02] auto-paused after terminal status
+[2026-07-15 22:56:02] auto-paused after terminal status
+[2026-07-15 22:58:02] auto-paused after terminal status
+[2026-07-15 23:00:02] auto-paused after terminal status
+[2026-07-15 23:02:02] auto-paused after terminal status
+[2026-07-15 23:04:02] auto-paused after terminal status
+[2026-07-15 23:06:02] auto-paused after terminal status
+[2026-07-15 23:08:02] auto-paused after terminal status
+[2026-07-15 23:10:02] auto-paused after terminal status
+[2026-07-15 23:12:02] auto-paused after terminal status
+[2026-07-15 23:14:02] auto-paused after terminal status
+[2026-07-15 23:16:02] auto-paused after terminal status
+[2026-07-15 23:32:24] auto-paused after terminal status
+[2026-07-15 23:43:56] auto-paused after terminal status
+[2026-07-15 23:44:02] auto-paused after terminal status
+[2026-07-15 23:46:02] auto-paused after terminal status
+[2026-07-15 23:57:40] auto-paused after terminal status
+[2026-07-15 23:58:03] auto-paused after terminal status
+[2026-07-16 00:00:02] auto-paused after terminal status
+[2026-07-16 00:02:02] auto-paused after terminal status
+[2026-07-16 00:02:24] auto-paused after terminal status
+[2026-07-16 00:02:25] auto-paused after terminal status
+[2026-07-16 09:17:35] auto-paused after terminal status
+[2026-07-16 09:40:41] auto-paused after terminal status
+[2026-07-16 09:41:35] auto-paused after terminal status
+[2026-07-16 09:43:35] auto-paused after terminal status
+[2026-07-16 09:45:35] auto-paused after terminal status
+[2026-07-16 09:47:35] auto-paused after terminal status
+[2026-07-16 09:47:52] auto-paused after terminal status
+[2026-07-16 09:47:54] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:47:54] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpyv0v2pkj/window.png, size=489544
+[2026-07-16 09:47:55] ocr length=314
+[2026-07-16 09:47:55] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:47:55] no status extracted, falling back to cache
+[2026-07-16 09:48:20] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:48:20] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmphmt2saae/window.png, size=481461
+[2026-07-16 09:48:20] ocr length=259
+[2026-07-16 09:48:20] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:48:20] no status extracted, falling back to cache
+[2026-07-16 09:48:26] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:48:26] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpjaux301p/window.png, size=481514
+[2026-07-16 09:48:27] ocr length=259
+[2026-07-16 09:48:27] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:48:27] no status extracted, falling back to cache
+[2026-07-16 09:48:28] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:48:28] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpl9gwiryp/window.png, size=483024
+[2026-07-16 09:48:28] ocr length=262
+[2026-07-16 09:48:28] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:48:28] no status extracted, falling back to cache
+[2026-07-16 09:50:28] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:50:28] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp2z12a21j/window.png, size=482996
+[2026-07-16 09:50:29] ocr length=270
+[2026-07-16 09:50:29] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:50:29] no status extracted, falling back to cache
+[2026-07-16 09:50:36] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:50:36] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpqb0sza7o/window.png, size=472246
+[2026-07-16 09:50:37] ocr length=313
+[2026-07-16 09:50:37] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:50:37] no status extracted, falling back to cache
+[2026-07-16 09:52:28] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:52:28] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp5j_zszwi/window.png, size=483105
+[2026-07-16 09:52:29] ocr length=270
+[2026-07-16 09:52:29] extracted: status='', eta='10:45-11:05', distance=''
+[2026-07-16 09:52:29] no status extracted, falling back to cache
+[2026-07-16 09:53:09] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:53:09] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp73h762ls/window.png, size=483093
+[2026-07-16 09:53:10] vision ocr succeeded, length=263
+[2026-07-16 09:53:10] ocr length=263
+[2026-07-16 09:53:10] extracted: status='商家已接单', eta='10:45-11:05', distance=''
+[2026-07-16 09:53:10] cache updated
+[2026-07-16 09:54:28] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:54:28] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpy9slee5j/window.png, size=483024
+[2026-07-16 09:54:29] vision ocr succeeded, length=263
+[2026-07-16 09:54:29] ocr length=263
+[2026-07-16 09:54:29] extracted: status='商家已接单', eta='10:45-11:05', distance=''
+[2026-07-16 09:54:29] cache updated
+[2026-07-16 09:56:01] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:56:01] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpfbqgvqo3/window.png, size=481570
+[2026-07-16 09:56:02] vision ocr succeeded, length=265
+[2026-07-16 09:56:02] ocr length=265
+[2026-07-16 09:56:02] extracted: status='商家已接单', eta='10:45-11:05', distance=''
+[2026-07-16 09:56:02] cache updated
+[2026-07-16 09:57:44] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 09:57:44] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp76wp4vhp/window.png, size=481514
+[2026-07-16 09:57:44] vision ocr succeeded, length=265
+[2026-07-16 09:57:44] ocr length=265
+[2026-07-16 09:57:44] extracted: status='商家已接单', eta='10:45-11:05', distance=''
+[2026-07-16 09:57:44] cache updated
+[2026-07-16 10:08:04] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:08:04] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpincgpwuw/window.png, size=483024
+[2026-07-16 10:08:04] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:08:04] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmprl3uar39/window.png, size=483024
+[2026-07-16 10:08:04] vision ocr succeeded, length=263
+[2026-07-16 10:08:04] ocr length=263
+[2026-07-16 10:08:04] extracted: status='商家已接单', eta='10:45-11:05', distance=''
+[2026-07-16 10:08:04] cache updated
+[2026-07-16 10:08:05] vision ocr succeeded, length=263
+[2026-07-16 10:08:05] ocr length=263
+[2026-07-16 10:08:05] extracted: status='商家已接单', eta='10:45-11:05', distance=''
+[2026-07-16 10:08:05] cache updated
+[2026-07-16 10:10:04] find_window returned None
+[2026-07-16 10:10:04] exception: 未找到淘宝闪购小程序窗口
+Traceback (most recent call last):
+  File "/Users/yangqian/Library/CloudStorage/OneDrive-Personal/102_config/SwiftBar/taobao_flash_status.2m.py", line 361, in main
+    raise RuntimeError("未找到淘宝闪购小程序窗口")
+RuntimeError: 未找到淘宝闪购小程序窗口
+
+[2026-07-16 10:11:55] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:11:55] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp7tyo06p4/window.png, size=474142
+[2026-07-16 10:11:55] vision ocr succeeded, length=255
+[2026-07-16 10:11:55] ocr length=255
+[2026-07-16 10:11:55] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:11:55] cache updated
+[2026-07-16 10:11:57] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:11:57] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpmrkvb4f8/window.png, size=481055
+[2026-07-16 10:11:57] vision ocr succeeded, length=256
+[2026-07-16 10:11:57] ocr length=256
+[2026-07-16 10:11:57] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:11:57] cache updated
+[2026-07-16 10:15:58] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:15:58] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp7uimftkz/window.png, size=419454
+[2026-07-16 10:15:58] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:15:58] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpvxw9gdmw/window.png, size=413970
+[2026-07-16 10:15:58] vision ocr succeeded, length=291
+[2026-07-16 10:15:58] ocr length=291
+[2026-07-16 10:15:58] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:15:58] cache updated
+[2026-07-16 10:15:58] vision ocr succeeded, length=286
+[2026-07-16 10:15:58] ocr length=286
+[2026-07-16 10:15:58] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:15:58] cache updated
+[2026-07-16 10:15:59] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:15:59] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp72vew0c4/window.png, size=523637
+[2026-07-16 10:15:59] vision ocr succeeded, length=254
+[2026-07-16 10:15:59] ocr length=254
+[2026-07-16 10:15:59] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:15:59] cache updated
+[2026-07-16 10:16:02] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:16:02] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmps5km2j19/window.png, size=582815
+[2026-07-16 10:16:02] vision ocr succeeded, length=346
+[2026-07-16 10:16:02] ocr length=346
+[2026-07-16 10:16:02] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:16:02] cache updated
+[2026-07-16 10:16:06] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:16:06] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpaukqoh2k/window.png, size=583809
+[2026-07-16 10:16:07] vision ocr succeeded, length=344
+[2026-07-16 10:16:07] ocr length=344
+[2026-07-16 10:16:07] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:16:07] cache updated
+[2026-07-16 10:16:17] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:16:17] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmp9iqrps_m/window.png, size=519509
+[2026-07-16 10:16:18] vision ocr succeeded, length=285
+[2026-07-16 10:16:18] ocr length=285
+[2026-07-16 10:16:18] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:16:18] cache updated
+[2026-07-16 10:18:18] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:18:18] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:18:18] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpw0s2fibr/window.png, size=475110
+[2026-07-16 10:18:18] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpm8nqo73z/window.png, size=475110
+[2026-07-16 10:18:19] vision ocr succeeded, length=280
+[2026-07-16 10:18:19] ocr length=280
+[2026-07-16 10:18:19] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:18:19] cache updated
+[2026-07-16 10:18:19] vision ocr succeeded, length=280
+[2026-07-16 10:18:19] ocr length=280
+[2026-07-16 10:18:19] extracted: status='商家备货中', eta='10:45-11:05', distance=''
+[2026-07-16 10:18:19] cache updated
+[2026-07-16 10:18:27] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:18:27] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpa2s6yhkg/window.png, size=472423
+[2026-07-16 10:18:27] vision ocr succeeded, length=282
+[2026-07-16 10:18:27] ocr length=282
+[2026-07-16 10:18:27] extracted: status='骑手已接单', eta='10:45-11:05', distance=''
+[2026-07-16 10:18:27] cache updated
+[2026-07-16 10:18:59] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:19:00] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpx0ppt3xv/window.png, size=536042
+[2026-07-16 10:19:00] vision ocr succeeded, length=336
+[2026-07-16 10:19:00] ocr length=336
+[2026-07-16 10:19:00] extracted: status='骑手已接单', eta='10:45-11:05', distance='距商家291m'
+[2026-07-16 10:19:00] cache updated
+[2026-07-16 10:19:03] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:19:03] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpzdsd4uax/window.png, size=405963
+[2026-07-16 10:19:04] vision ocr succeeded, length=234
+[2026-07-16 10:19:04] ocr length=234
+[2026-07-16 10:19:04] extracted: status='骑手已接单', eta='10:45-11:05', distance='距商家316m'
+[2026-07-16 10:19:04] cache updated
+[2026-07-16 10:19:09] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:19:09] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpcc9d2llx/window.png, size=433550
+[2026-07-16 10:19:10] vision ocr succeeded, length=268
+[2026-07-16 10:19:10] ocr length=268
+[2026-07-16 10:19:10] extracted: status='骑手已接单', eta='10:45-11:05', distance='距商家316m'
+[2026-07-16 10:19:10] cache updated
+[2026-07-16 10:19:25] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:19:25] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpnphukcfj/window.png, size=429861
+[2026-07-16 10:19:25] vision ocr succeeded, length=262
+[2026-07-16 10:19:25] ocr length=262
+[2026-07-16 10:19:25] extracted: status='骑手已接单', eta='10:45-11:05', distance='距商家314m'
+[2026-07-16 10:19:25] cache updated
+[2026-07-16 10:21:10] window found: id=8123, title=淘宝闪购 l 饿了么外卖美食超市
+[2026-07-16 10:21:10] screenshot saved: /var/folders/l5/4h_jzxtx4kg62l_fhlr4fsyc0000gn/T/tmpa777wydh/window.png, size=542152
+[2026-07-16 10:21:10] vision ocr succeeded, length=341
+[2026-07-16 10:21:10] ocr length=341
+[2026-07-16 10:21:10] extracted: status='骑手已接单', eta='10:45-11:05', distance='距商家309m'
+[2026-07-16 10:21:10] cache updated

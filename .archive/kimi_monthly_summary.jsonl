@@ -10,4 +10,5 @@
 {"date": "2026-07-12", "recorded_at": "2026-07-12T16:39:22.380453+00:00", "subscription_balance": {"amountUsedRatio": 0.2571, "expireTime": "2026-08-03T00:00:00Z"}, "ratelimit_5h": {}, "ratelimit_7d": {}}
 {"date": "2026-07-13", "recorded_at": "2026-07-13T18:08:53.002674+00:00", "subscription_balance": {"amountUsedRatio": 0.2571, "expireTime": "2026-08-03T00:00:00Z"}, "ratelimit_5h": {}, "ratelimit_7d": {}}
 {"date": "2026-07-14", "recorded_at": "2026-07-14T23:59:05.685772+00:00", "subscription_balance": {"amountUsedRatio": 0.2879, "expireTime": "2026-08-03T00:00:00Z"}, "ratelimit_5h": {}, "ratelimit_7d": {}}
-{"date": "2026-07-15", "recorded_at": "2026-07-15T10:08:53.041604+00:00", "subscription_balance": {"amountUsedRatio": 0.3235, "expireTime": "2026-08-03T00:00:00Z"}, "ratelimit_5h": {}, "ratelimit_7d": {}}
+{"date": "2026-07-15", "recorded_at": "2026-07-15T16:01:58.727200+00:00", "subscription_balance": {"amountUsedRatio": 0.3342, "expireTime": "2026-08-03T00:00:00Z"}, "ratelimit_5h": {}, "ratelimit_7d": {}}
+{"date": "2026-07-16", "recorded_at": "2026-07-16T02:19:40.831500+00:00", "subscription_balance": {"amountUsedRatio": 0.3404, "expireTime": "2026-08-03T00:00:00Z"}, "ratelimit_5h": {}, "ratelimit_7d": {}}
