@@ -36,7 +36,7 @@ SwiftBar 插件: 淘宝闪购配送状态监控
    chmod +x "$HOME/Library/Application Support/SwiftBar/plugins/taobao_flash_status.2m.py"
 6. SwiftBar 会自动识别并显示在菜单栏
 
-刷新频率: 2分钟（文件名中的 .2m. 控制）
+刷新频率: 1分钟（文件名中的 .1m. 控制）
 """
 
 import json
@@ -45,6 +45,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 from datetime import datetime, timezone, timedelta
 from typing import Optional
@@ -59,6 +60,11 @@ OCR_HELPER_BIN = os.path.join(ARCHIVE_DIR, "taobao_flash_ocr_helper")
 CACHE_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.json")
 LOG_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.log")
 STATE_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status_state.json")
+LOCK_PATH = os.path.join(ARCHIVE_DIR, "taobao_flash_status.lock")
+
+# 文件锁有效期（秒）。SwiftBar 调度器可能把多次调用积压到同一秒执行，
+# 加锁可以避免并发/连发的实例重复做截图+OCR 这种重活。
+LOCK_TTL_SECONDS = 90
 
 # 窗口查找配置
 WINDOW_KEYWORD = "淘宝闪购"
@@ -84,6 +90,7 @@ STATUS_PATTERNS = [
     ("已送达", r"已送达|订单已完成|送达成功"),
     ("配送中", r"骑[手士]正在为你送[货餐]|正在为你送[货餐]|正在送[货餐]|按序送货|配送中|正在配送"),
     ("骑手已取货", r"骑[手士]已取[货餐]|骑[手士]已到店"),
+    ("骑手取货中", r"骑[手士]正在店内取货|正在店内取货.*?取货"),
     ("骑手已接单", r"骑[手士]已接单|骑[手士]正赶往商家|骑[手士]正在赶往商家|骑[手士]赶往商家|骑[手士]接单"),
     ("商家备货中", r"商家备货中|商家正在备[餐餐]|正在备[餐餐]|备货中"),
     ("商家已接单", r"商家已接单|商家已确认|已接单"),
@@ -100,10 +107,13 @@ ETA_PATTERNS = [
 
 # 距离/时间模式
 DISTANCE_PATTERNS = [
-    r"距你\s*([0-9Oo]+)\s*[米mM]",
-    r"距你\s*([0-9.]+)\s*[公里kmKM]",
-    r"距商[家冢]\s*([0-9Oo]+)\s*[米mM]",
-    r"距商[家冢]\s*([0-9.]+)\s*[公里kmKM]",
+    # 完整行: 距你Xkm Y分钟（固定一行出现）
+    r"距你\s*([0-9.]+)\s*(?:公里|km)\s*(\d+)\s*分钟",
+    # 单个距离/时间（兜底）
+    r"距你\s*([0-9Oo]+)\s*(?:米|m)",
+    r"距你\s*([0-9.]+)\s*(?:公里|km)",
+    r"距商[家冢]\s*([0-9Oo]+)\s*(?:米|m)",
+    r"距商[家冢]\s*([0-9.]+)\s*(?:公里|km)",
     r"大约?\s*(\d+)\s*分钟",
     r"(\d+)\s*分钟后?送达",
 ]
@@ -131,6 +141,33 @@ def log_debug(msg: str) -> None:
         now = datetime.now(BJT).strftime("%Y-%m-%d %H:%M:%S")
         with open(LOG_PATH, "a", encoding="utf-8") as f:
             f.write(f"[{now}] {msg}\n")
+    except Exception:
+        pass
+
+
+def is_lock_active() -> bool:
+    """判断是否有近期实例正在执行重活。"""
+    if not os.path.exists(LOCK_PATH):
+        return False
+    try:
+        mtime = os.path.getmtime(LOCK_PATH)
+        age = datetime.now().timestamp() - mtime
+        return age < LOCK_TTL_SECONDS
+    except Exception:
+        return False
+
+
+def touch_lock() -> None:
+    """标记当前实例开始执行重活。"""
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+    with open(LOCK_PATH, "w", encoding="utf-8") as f:
+        f.write(datetime.now(BJT).isoformat())
+
+
+def remove_lock() -> None:
+    """释放文件锁。"""
+    try:
+        os.remove(LOCK_PATH)
     except Exception:
         pass
 
@@ -293,15 +330,25 @@ def extract_eta(text: str) -> str:
 
 
 def extract_distance(text: str) -> str:
-    """从 OCR 文本中提取距离/剩余时间。"""
+    """从 OCR 文本中提取距离和剩余时间，合并为逗号分隔。"""
     compact = _compact(text)
+    parts = []
     for pattern in DISTANCE_PATTERNS:
         m = re.search(pattern, compact)
         if m:
+            groups = m.groups()
+            if len(groups) == 2 and groups[0] and groups[1]:
+                # 完整行: 距你Xkm Y分钟 → 6.3km,16m
+                dist = groups[0].replace("O", "0").replace("o", "0")
+                raw = f"{dist}km,{groups[1]}m"
+                return raw
             raw = m.group(0)
-            # 清理并简化显示：O->0，冢->家
-            raw = raw.replace(" ", "").replace("距你", "").replace("O", "0").replace("o", "0").replace("冢", "家")
-            return raw
+            # 清理并简化显示：O->0，冢->家，分钟->m
+            raw = raw.replace(" ", "").replace("距你", "").replace("O", "0").replace("o", "0").replace("冢", "家").replace("分钟", "m").replace("大约", "").replace("后送达", "").replace("送达", "").replace("公里", "km")
+            if raw and raw not in parts:
+                parts.append(raw)
+    if parts:
+        return ",".join(parts)
     return ""
 
 
@@ -349,7 +396,7 @@ def format_menu_title(status: str, eta: str, distance: str, order_count: str) ->
         extras.append(eta)
 
     if extras:
-        title += f" ({' '.join(extras)})"
+        title += f"({' '.join(extras)})"
     return title
 
 
@@ -382,61 +429,10 @@ def main():
     order_count = ""
     window_title = ""
 
-    try:
-        window = find_window()
-        if window is None:
-            log_debug("find_window returned None")
-            raise RuntimeError("未找到淘宝闪购小程序窗口")
-
-        window_found = True
-        window_title = window.get("name", "")
-        window_id = window.get("id")
-        log_debug(f"window found: id={window_id}, title={window_title}")
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            png_path = os.path.join(tmpdir, "window.png")
-            capture_window(window_id, png_path)
-            log_debug(f"screenshot saved: {png_path}, size={os.path.getsize(png_path)}")
-            ocr_text = ocr_image(png_path)
-            log_debug(f"ocr length={len(ocr_text)}")
-
-        status = extract_status(ocr_text)
-        eta = extract_eta(ocr_text)
-        distance = extract_distance(ocr_text)
-        order_count = extract_order_count(ocr_text)
-        log_debug(f"extracted: status={status!r}, eta={eta!r}, distance={distance!r}, order_count={order_count!r}")
-
-        # 只有成功提取到状态时才更新缓存和时间戳
-        if status:
-            cache = {
-                "status": status,
-                "eta": eta,
-                "distance": distance,
-                "order_count": order_count,
-                "window_title": window_title,
-                "ocr_text": ocr_text,
-                "updated_at": datetime.now(BJT).isoformat(),
-            }
-            save_cache(cache)
-            log_debug("cache updated")
-
-            # 到达终态时记录完成时间，用于自动暂停
-            if status in TERMINAL_STATUSES:
-                state["completed_at"] = datetime.now(BJT).isoformat()
-            else:
-                state["completed_at"] = ""
-        else:
-            # 截图成功但无法识别状态：保留原缓存
-            log_debug("no status extracted, falling back to cache")
-            status = cache.get("status", "")
-            eta = cache.get("eta", "")
-            distance = cache.get("distance", "")
-            order_count = cache.get("order_count", "")
-            error_msg = "未从当前截图中识别到配送状态"
-    except Exception as e:
-        error_msg = str(e)
-        log_debug(f"exception: {error_msg}\n{traceback.format_exc()}")
-        # 出错时使用缓存
+    # SwiftBar 的调度器不稳定，可能会把多次调用积压到同一秒执行。
+    # 如果近期已经有实例在跑重活，本次直接读缓存，避免重复截图/OCR。
+    if is_lock_active():
+        log_debug("recent lock found, skipping heavy work and using cache")
         from_cache = True
         status = cache.get("status", "")
         eta = cache.get("eta", "")
@@ -444,14 +440,84 @@ def main():
         order_count = cache.get("order_count", "")
         ocr_text = cache.get("ocr_text", "")
         window_title = cache.get("window_title", "")
+    else:
+        touch_lock()
+        work_start = time.time()
+        try:
+            window = find_window()
+            if window is None:
+                log_debug("find_window returned None")
+                raise RuntimeError("未找到淘宝闪购小程序窗口")
+
+            window_found = True
+            window_title = window.get("name", "")
+            window_id = window.get("id")
+            log_debug(f"window found: id={window_id}, title={window_title}")
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                png_path = os.path.join(tmpdir, "window.png")
+                capture_window(window_id, png_path)
+                log_debug(f"screenshot saved: {png_path}, size={os.path.getsize(png_path)}")
+                ocr_text = ocr_image(png_path)
+                log_debug(f"ocr length={len(ocr_text)}")
+
+            status = extract_status(ocr_text)
+            eta = extract_eta(ocr_text)
+            distance = extract_distance(ocr_text)
+            order_count = extract_order_count(ocr_text)
+            log_debug(f"extracted: status={status!r}, eta={eta!r}, distance={distance!r}, order_count={order_count!r}")
+
+            # 只有成功提取到状态时才更新缓存和时间戳
+            if status:
+                cache = {
+                    "status": status,
+                    "eta": eta,
+                    "distance": distance,
+                    "order_count": order_count,
+                    "window_title": window_title,
+                    "ocr_text": ocr_text,
+                    "updated_at": datetime.now(BJT).isoformat(),
+                }
+                save_cache(cache)
+                log_debug("cache updated")
+
+                # 到达终态时记录完成时间，用于自动暂停
+                if status in TERMINAL_STATUSES:
+                    state["completed_at"] = datetime.now(BJT).isoformat()
+                else:
+                    state["completed_at"] = ""
+            else:
+                # 截图成功但无法识别状态：保留原缓存
+                log_debug("no status extracted, falling back to cache")
+                status = cache.get("status", "")
+                eta = cache.get("eta", "")
+                distance = cache.get("distance", "")
+                order_count = cache.get("order_count", "")
+                error_msg = "未从当前截图中识别到配送状态"
+        except Exception as e:
+            error_msg = str(e)
+            log_debug(f"exception: {error_msg}\n{traceback.format_exc()}")
+            # 出错时使用缓存
+            from_cache = True
+            status = cache.get("status", "")
+            eta = cache.get("eta", "")
+            distance = cache.get("distance", "")
+            order_count = cache.get("order_count", "")
+            ocr_text = cache.get("ocr_text", "")
+            window_title = cache.get("window_title", "")
+        finally:
+            elapsed = time.time() - work_start
+            log_debug(f"work elapsed {elapsed:.2f}s")
+            remove_lock()
 
     save_state(state)
 
-    # 菜单栏标题
+    # 菜单栏标题（末尾追加更新分钟）
     title = format_menu_title(status, eta, distance, order_count)
     if error_msg and not status:
         title = "🛒 未找到窗口"
-    print(f"{title} | font='Sarasa Mono SC' refresh=true size=13")
+    current_min = datetime.now(BJT).strftime("%M")
+    print(f"{title}{current_min} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 下拉详情
