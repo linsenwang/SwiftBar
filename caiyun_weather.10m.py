@@ -9,6 +9,7 @@
 SwiftBar 插件: 彩云天气
 数据来源: 彩云天气 H5 内部 API (逆向获取, token: Y2FpeXVuIGFwaSB3ZWI)
 位置: 118.0987, 24.4365 (厦门)
+119.3111,26.0782 (福州)
 刷新频率: 2分钟
 """
 
@@ -42,7 +43,8 @@ from datetime import datetime, timedelta
 #   替换掉下面的 TOKEN 即可。
 # -----------------------------------------------------------------------------
 TOKEN = "Y2FpeXVuIGFwaSB3ZWI"
-LNG, LAT = "118.0987", "24.4365"
+# LNG, LAT = "118.0987", "24.4365" #厦门
+LNG, LAT = "119.3111", "26.0782" #福州
 API_URL = f"https://api.caiyunapp.com/v2/{TOKEN}/{LNG},{LAT}/weather.jsonp"
 
 import struct

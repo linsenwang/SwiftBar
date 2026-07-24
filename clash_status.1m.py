@@ -10,7 +10,7 @@ SwiftBar 插件: Clash 状态监控（9090 端口）
 刷新频率: 1 分钟（文件名中的 .1m. 控制）
 
 功能:
-- 菜单栏显示当前代理节点的国旗/地区旗和延迟（白色字体，与深色菜单栏一致）
+- 菜单栏显示当前代理节点的国旗/地区旗和延迟
 - 点击标题立即刷新
 - 下拉菜单显示实时上下行速率/总量、当前模式、已选地区组
 - 支持在指定 Selector 组内一键切换地区/线路（直接平铺展示，不折叠）
@@ -211,7 +211,7 @@ def main():
         delay = last_history_delay(current_info)
     flag = extract_flag(current)
     delay_text = f"{delay}ms" if delay is not None else "-"
-    print(f"{flag} {delay_text} | font='Sarasa Mono SC' refresh=true size=13 color=#FFFFFF")
+    print(f"{flag} {delay_text} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 3) 实时速率

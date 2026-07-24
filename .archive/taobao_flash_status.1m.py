@@ -380,7 +380,7 @@ def save_cache(data: dict) -> None:
 
 
 def format_menu_title(status: str, eta: str, distance: str, order_count: str) -> str:
-    """生成菜单栏标题，保持简洁。优先级：距离 > 单数 > 预计时间。
+    """生成菜单栏标题，保持简洁。距离/时间与剩余单数同时展示，单数始终显示。
     有具体状态时不再显示购物车图标，只有未识别/暂停时才显示图标用于点击。"""
     if status:
         title = status
@@ -390,10 +390,10 @@ def format_menu_title(status: str, eta: str, distance: str, order_count: str) ->
     extras = []
     if distance:
         extras.append(distance)
-    elif order_count:
-        extras.append(order_count)
     elif eta:
         extras.append(eta)
+    if order_count:
+        extras.append(order_count)
 
     if extras:
         title += f"({' '.join(extras)})"

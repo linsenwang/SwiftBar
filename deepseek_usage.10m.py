@@ -129,14 +129,20 @@ def append_balance_log(balance: float) -> None:
 
 
 def calc_spending(records: list[dict], since: datetime) -> float:
-    """从日志记录中计算自 since 以来的总花费（余额减少量）。"""
+    """从日志记录中计算自 since 以来的总花费（余额减少量）。
+
+    逐段累加余额下降，遇到充值（余额上升）时不抵消，避免月度/今日花费被充值抹成 0。
+    """
     records_in_range = [r for r in records if r["ts"] >= since.strftime("%Y-%m-%d")]
     if len(records_in_range) < 2:
         return 0.0
-    first = records_in_range[0]["balance"]
-    last = records_in_range[-1]["balance"]
-    spending = first - last
-    return max(0.0, spending)
+
+    spending = 0.0
+    for prev, curr in zip(records_in_range, records_in_range[1:]):
+        drop = prev["balance"] - curr["balance"]
+        if drop > 0:
+            spending += drop
+    return spending
 
 
 def get_daily_spending(records: list[dict]) -> list[tuple[str, float]]:
@@ -158,8 +164,12 @@ def get_daily_spending(records: list[dict]) -> list[tuple[str, float]]:
             label = d.strftime("%m-%d")
 
         if len(day_records) >= 2:
-            spent = day_records[0]["balance"] - day_records[-1]["balance"]
-            result.append((label, max(0.0, spent)))
+            spent = 0.0
+            for prev, curr in zip(day_records, day_records[1:]):
+                drop = prev["balance"] - curr["balance"]
+                if drop > 0:
+                    spent += drop
+            result.append((label, spent))
         else:
             result.append((label, 0.0))
 
