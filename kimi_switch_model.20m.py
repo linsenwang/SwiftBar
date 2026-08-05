@@ -117,6 +117,7 @@ def short_label(model_key: str) -> str:
         "deepseek/deepseek-v4-flash": "V4F",
         "deepseek/deepseek-v4-pro": "V4P",
         "dsv4": "OV4F",
+        "luna": "Luna",
     }
     if model_key in LABELS:
         return LABELS[model_key]
