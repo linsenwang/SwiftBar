@@ -115,9 +115,11 @@ def short_label(model_key: str) -> str:
     LABELS = {
         "kimi-code/kimi-for-coding": "K",
         "deepseek/deepseek-v4-flash": "V4F",
+        "deepseek/deepseek-v4.1-flash": "V4.1",
         "deepseek/deepseek-v4-pro": "V4P",
-        "dsv4": "OV4F",
+        "dsv4": "ORV4F",
         "luna": "Luna",
+        "opencode/deepseek-v4-flash-free": "Free",
     }
     if model_key in LABELS:
         return LABELS[model_key]
@@ -143,6 +145,7 @@ def print_menu(current: str, models_info: dict):
     label = short_label(current)
     print(f"{label} | font='Sarasa Mono SC' size=13")
     print("---")
+    # print("9-12 14-18 | font='Sarasa Mono SC' size=13 refresh=true")
     cur_disp = models_info.get(current, (current, ""))[0]
     # print(f"当前: {cur_disp} | refresh=true")
     # print("---")

@@ -10,7 +10,12 @@ SwiftBar 插件: 彩云天气
 数据来源: 彩云天气 H5 内部 API (逆向获取, token: Y2FpeXVuIGFwaSB3ZWI)
 位置: 118.0987, 24.4365 (厦门)
 119.3111,26.0782 (福州)
-刷新频率: 2分钟
+刷新频率: 10分钟
+
+数据采集: 可把与体感温度相关的实时数据（温度/湿度/风速等环境量
++ 官方体感温度）追加到 .archive/caiyun_apparent_log.jsonl，供回归拟合
+体感温度公式使用。采集默认关闭（LOG_APPARENT_ENABLED=False），冬天校准
+低温段公式时可再打开。
 """
 
 import json
@@ -18,7 +23,8 @@ import urllib.request
 import re
 import random
 import base64
-from datetime import datetime, timedelta
+import os
+from datetime import datetime, timedelta, timezone
 
 # 配置
 # -----------------------------------------------------------------------------
@@ -43,8 +49,9 @@ from datetime import datetime, timedelta
 #   替换掉下面的 TOKEN 即可。
 # -----------------------------------------------------------------------------
 TOKEN = "Y2FpeXVuIGFwaSB3ZWI"
-# LNG, LAT = "118.0987", "24.4365" #厦门
-LNG, LAT = "119.3111", "26.0782" #福州
+# LNG, LAT = "118.0987", "24.4365" #思明
+LNG, LAT = "118.1149", "24.4394" #学公
+# LNG, LAT = "119.3111", "26.0782" #福州
 API_URL = f"https://api.caiyunapp.com/v2/{TOKEN}/{LNG},{LAT}/weather.jsonp"
 
 import struct
@@ -257,30 +264,29 @@ def format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today,
 
 # 降雨等级（按小时降水强度 mm/h） → 返回 (图标, 映射用的 skycon_key)
 def apparent_temperature(temp_c, humidity_frac, wind_speed_ms):
-    """估算体感温度。
+    """体感温度（2026-08 回归拟合自彩云官方，228 个样本）。
 
-    高温时参考中国气象部门常用的湿度修正（高湿闷热，风速降温弱）；
-    低温时使用标准风寒公式；中间温度平滑过渡。
+    公式: at = 1.04*T + 0.2*e - 0.18*V - 2.7
+          e = RH * 6.105*exp(17.27*T/(237.7+T))  (实际水汽压 hPa, Magnus)
+    拟合精度: MAE≈0.02°C，100% 样本误差 ≤0.1°C（官方值本身只精确到 0.1），
+    实测覆盖 T 25~39°C，24.4°C 夜间样本亦吻合。
+    低温（T<10°C）官方行为无数据验证，暂保留标准风寒公式。
     """
     import math
     try:
-        rh = max(0.0, min(1.0, float(humidity_frac))) * 100.0  # 转成百分比
+        rh = max(0.0, min(1.0, float(humidity_frac)))  # 0-1
         t = float(temp_c)
         ws = max(0.0, float(wind_speed_ms))
     except (TypeError, ValueError):
         return None
 
-    if t >= 26:
-        # 高温高湿：湿度越高越闷热
-        at = t + 0.07 * (rh - 50)
-    elif t <= 10:
-        # 低温：风寒效应（标准风冷公式，单位 °C / m/s）
-        at = 13.12 + 0.6215 * t - 11.37 * (ws ** 0.16) + 0.3965 * t * (ws ** 0.16)
+    if t >= 10:
+        # 拟合公式（含湿度经水汽压 e 的指数型影响 + 风速线性降温）
+        e = rh * 6.105 * math.exp(17.27 * t / (237.7 + t))
+        return 1.04 * t + 0.2 * e - 0.18 * ws - 2.7
     else:
-        # 过渡区：湿度影响随温度线性减弱
-        humidity_factor = (t - 10) / 16.0
-        at = t + 0.07 * (rh - 50) * humidity_factor
-    return at
+        # 低温：标准风寒公式（单位 °C / m/s）
+        return 13.12 + 0.6215 * t - 11.37 * (ws ** 0.16) + 0.3965 * t * (ws ** 0.16)
 
 
 def precip_level(val):
@@ -401,6 +407,92 @@ def fetch_weather():
         return None
 
 
+# ---------------------------------------------------------------------------
+# 体感温度数据采集（供后续回归拟合）
+# ---------------------------------------------------------------------------
+BJT = timezone(timedelta(hours=8))  # 北京时间 (UTC+8)
+ARCHIVE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".archive")
+APPARENT_LOG_PATH = os.path.join(ARCHIVE_DIR, "caiyun_apparent_log.jsonl")
+LOG_APPARENT_ENABLED = False  # 采集开关：默认关闭；冬天想校准低温段公式时再打开
+LOG_INTERVAL_MINUTES = 30  # 采集最小间隔：距上一条记录不足该分钟数则跳过
+
+
+def log_apparent_data(data):
+    """把与体感温度相关的实时数据追加到日志，供后续回归拟合使用。
+
+    记录 realtime 的完整环境量（温度/湿度/风速风向/云量/辐射/气压/能见度等）
+    + 官方体感温度（作为回归目标 y）+ 当前估算值（作为基线对比）。
+    LOG_APPARENT_ENABLED 为 False 时不采集（默认关闭）。
+    节流规则（两者都检查）:
+    - 与日志最后一条记录的 server_time 相同 → 跳过（同一份 API 数据）
+    - 距最后一条记录不足 LOG_INTERVAL_MINUTES 分钟 → 跳过（避免记录过密）
+    """
+    if not LOG_APPARENT_ENABLED:
+        return
+    result = data.get("result", {}) or {}
+    rt = result.get("realtime", {}) or {}
+    server_time = data.get("server_time", 0)
+    if not rt or not server_time:
+        return
+
+    # 读日志尾部最后一条有效记录，判断是否需要跳过
+    if os.path.exists(APPARENT_LOG_PATH):
+        with open(APPARENT_LOG_PATH, "rb") as f:
+            f.seek(0, 2)  # EOF
+            size = f.tell()
+            if size > 0:
+                f.seek(max(0, size - 512))
+                tail = f.read().decode("utf-8", errors="ignore").strip().split("\n")
+                last_rec = None
+                for line in reversed(tail):
+                    if not line.strip():
+                        continue
+                    try:
+                        last_rec = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    break
+                if last_rec:
+                    if last_rec.get("server_time") == server_time:
+                        return  # 同一份 API 数据，不重复记录
+                    try:
+                        last_dt = datetime.strptime(last_rec.get("ts", ""), "%Y-%m-%dT%H:%M:%S%z")
+                        if datetime.now(BJT) - last_dt < timedelta(minutes=LOG_INTERVAL_MINUTES):
+                            return  # 距上一条记录太近，跳过
+                    except ValueError:
+                        pass
+
+    wind = rt.get("wind", {}) or {}
+    temp = rt.get("temperature", 0)
+    humidity = rt.get("humidity", 0)
+    wind_speed = wind.get("speed", 0)
+    record = {
+        "ts": datetime.now(BJT).strftime("%Y-%m-%dT%H:%M:%S+08:00"),
+        "server_time": server_time,
+        "lng": LNG,
+        "lat": LAT,
+        # ---- 输入特征（回归自变量）----
+        "temperature": temp,                              # °C
+        "humidity": humidity,                             # 相对湿度 0-1
+        "wind_speed": wind_speed,                         # m/s
+        "wind_direction": wind.get("direction", 0),       # °
+        "cloudrate": rt.get("cloudrate"),                 # 云量 0-1
+        "dswrf": rt.get("dswrf"),                         # 向下短波辐射 W/m²
+        "pres": rt.get("pres"),                           # 气压 Pa
+        "visibility": rt.get("visibility"),               # 能见度 km
+        "skycon": rt.get("skycon"),                       # 天气现象
+        "aqi": rt.get("aqi"),                             # AQI
+        "precip_local_intensity": ((rt.get("precipitation") or {}).get("local") or {}).get("intensity"),  # 本地降雨 mm/h
+        # ---- 目标值 y ----
+        "apparent_temperature": rt.get("apparent_temperature", temp),  # 官方体感温度 °C
+        # ---- 基线：脚本当前启发式估算 ----
+        "est_apparent_temperature": apparent_temperature(temp, humidity, wind_speed),
+    }
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+    with open(APPARENT_LOG_PATH, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def main():
     data = fetch_weather()
     if not data or data.get("status") != "ok":
@@ -412,6 +504,10 @@ def main():
 
     result = data.get("result", {})
     rt = result.get("realtime", {})
+
+    # 体感温度数据采集（写日志，不影响展示）
+    log_apparent_data(data)
+
     daily = result.get("daily", {})
     forecast_keypoint = result.get("forecast_keypoint", "")
 
@@ -540,8 +636,8 @@ def main():
         direct_hours = 12
         end_idx = min(start_idx + direct_hours, hourly_count)
         for i in range(start_idx, end_idx):
-            # 仅当前 5 小时且无雨时显示体感温度
-            show_apparent = (i - start_idx) < 5
+            # 仅当前 10 小时且无雨时显示体感温度
+            show_apparent = (i - start_idx) < 24
             line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
                                       hourly_humidity, show_apparent)
             print(f"{line} | font='Sarasa Mono SC' size=13 refresh=true")
@@ -551,7 +647,7 @@ def main():
             print("逐小时预报 | font='Sarasa Mono SC' size=13 refresh=true")
             for i in range(end_idx, hourly_count):
                 line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
-                                          hourly_humidity, show_apparent=False)
+                                          hourly_humidity, show_apparent)
                 print(f"-- {line} | font='Sarasa Mono SC' size=13 refresh=true")
         print("---")
 

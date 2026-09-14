@@ -189,7 +189,8 @@ def main():
     configs = api_call("/configs", secret=secret)
     proxies = api_call("/proxies", secret=secret)
     if configs is None or proxies is None:
-        print("⚠️ Clash 离线 | refresh=true size=13 color=red")
+        print("Clash | refresh=true size=13")
+        # print("Clash | refresh=true size=13 color=red")
         print("---")
         print(f"无法连接 {CLASH_HOST} | color=red refresh=true")
         return

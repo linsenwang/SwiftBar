@@ -37,6 +37,7 @@ import re
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
+from typing import Optional
 
 # 北京时间 (UTC+8)
 BJT = timezone(timedelta(hours=8))
@@ -129,6 +130,14 @@ def load_balance_log(path: str) -> list[dict]:
                 except json.JSONDecodeError:
                     pass
     return records
+
+
+def load_last_balance(path: str) -> Optional[float]:
+    """从余额日志读取最近一次余额，作为接口失败时的缓存回退。"""
+    records = load_balance_log(path)
+    if not records:
+        return None
+    return records[-1]["balance"]
 
 
 def append_balance_log(path: str, balance: float) -> None:
@@ -241,7 +250,12 @@ def main():
             total_credits, total_usage = fetch_or_balance(mgmt_key)
             or_balance_usd = total_credits - total_usage
         except Exception as e:
-            errors.append(f"R 获取余额失败: {e}")
+            cached = load_last_balance(OR_BALANCE_LOG_PATH)
+            if cached is not None:
+                or_balance_usd = cached
+                errors.append(f"R 获取余额失败，已用缓存余额显示: {e}")
+            else:
+                errors.append(f"R 获取余额失败: {e}")
 
     if ds_balance is None and or_balance_usd is None:
         print("? | refresh=true")
@@ -288,7 +302,7 @@ def main():
     )
     print(f"{fmt2(total_today)} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
-
+    print("9-12 14-18 | font='Sarasa Mono SC' size=13 refresh=true")
     # ---- 月度 / 7日 汇总（指标提到前面，D / R 同行）----
     m_parts = []
     if ds_balance is not None:
