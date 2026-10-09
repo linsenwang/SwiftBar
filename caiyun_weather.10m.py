@@ -248,10 +248,15 @@ def format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today,
     a = daily_aqi[i] if i < len(daily_aqi) else {}
     w = daily_wind[i] if i < len(daily_wind) else {}
 
-    dt = today + timedelta(days=i)
+    # 日期以接口返回的 date 字段为准；解析失败才退回"今天 + i 天"
+    try:
+        dt = datetime.strptime(t.get("date", ""), "%Y-%m-%d")
+    except (TypeError, ValueError):
+        dt = today + timedelta(days=i)
     wd = weekdays[dt.weekday()]
     date_str = dt.strftime("%m-%d")
-    label = "今天" if i == 0 else ("明天" if i == 1 else f"{wd}")
+    delta = (dt.date() - today.date()).days
+    label = "今天" if delta == 0 else ("明天" if delta == 1 else f"{wd}")
 
     t_max = t.get("max", 0)
     t_min = t.get("min", 0)
@@ -612,7 +617,8 @@ def main():
     #     print("---")
 
     # 未来预报
-    weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+    # 注意顺序需与 datetime.weekday() 对齐：周一=0 … 周日=6
+    weekdays = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
     today = datetime.now()
 
     # 逐小时预报 (今天起未来12小时)
