@@ -15,8 +15,10 @@ SwiftBar 插件: DeepSeek + OpenRouter API 用量监控
 功能:
 - 菜单栏显示 DeepSeek + OpenRouter 今日花费合计（单个数字，均为人民币）
 - 下拉菜单用 D / R 前缀区分两家，D 与 R 同一行显示: 月度、7日、每日花费、余额
-- 两家完全同思路: 记余额（D 充值余额 / R 剩余 credits），每日花费 = 余额差分
+- 两家完全同思路: 记余额（D 总余额 total_balance / R 剩余 credits），每日花费 = 余额差分
   （余额下降量累加，充值不抵消），日志用北京时间时间戳
+  注意: DeepSeek 先扣 granted_balance（赠送/返钱）再扣 topped_up_balance，
+        必须用 total_balance，否则返钱后余额会看起来一直不动
 - OpenRouter 数值单位为 USD（1 credit = $1），按固定汇率 USD_CNY_RATE 换算为 CNY
 
 安装:
@@ -77,7 +79,11 @@ def get_or_mgmt_key() -> str:
 
 
 def fetch_balance(api_key: str) -> float:
-    """调用 api.deepseek.com/user/balance 获取当前余额（CNY）。"""
+    """调用 api.deepseek.com/user/balance 获取当前总余额（CNY）。
+
+    用 total_balance（= granted_balance + topped_up_balance），因为 DeepSeek
+    会优先扣赠送/返钱余额，只看 topped_up_balance 会导致余额“不动”、花费为 0。
+    """
     req = urllib.request.Request(
         BALANCE_URL,
         headers={
@@ -87,10 +93,13 @@ def fetch_balance(api_key: str) -> float:
     )
     with urllib.request.urlopen(req, timeout=10) as resp:
         data = json.load(resp)
-    # 取 topped_up_balance（充值余额），CNY 货币
     for info in data.get("balance_infos", []):
         if info.get("currency") == "CNY":
-            return float(info["topped_up_balance"])
+            total = info.get("total_balance")
+            if total is not None:
+                return float(total)
+            # 兼容旧字段: 无 total_balance 时退回充值余额
+            return float(info.get("topped_up_balance") or 0.0)
     return 0.0
 
 

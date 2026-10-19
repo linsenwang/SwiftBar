@@ -11,7 +11,7 @@ SwiftBar 插件: BetterTouchTool 触发器（trigger）快速开关
 刷新频率: 1 分钟（文件名里的 .1m. 控制）
 
 功能:
-- 菜单栏只显示已启用的数量，例如 🖱 9；总数看菜单里各分组标题上的 x/y
+- 菜单栏只显示已启用的数量，例如 9；总数看菜单里各分组标题上的 x/y
 - 下拉菜单按 BTT 的分组列出触发器，✓ 已启用 / ✗ 已停用，点一下即切换
 - 全局触发器按类别分组：Mouse Buttons 直接展开，其余类别收进子菜单（悬停展开）
 - 绑定了特定应用的触发器（比如只在 Finder 里生效的）按应用分组，统一收进子菜单
@@ -382,7 +382,7 @@ def row_line(row: dict, indent: int = 0) -> str:
 
 def print_menu():
     if not btt_running():
-        print(f"🖱 未运行 | {FONT} size=13 refresh=true")
+        print(f"未运行 | {FONT} size=13 refresh=true")
         print("---")
         print(f"BetterTouchTool 没有运行 | {FONT} size=13 color={COLOR_ERR} refresh=true")
         print("---")
@@ -399,7 +399,7 @@ def print_menu():
         if app not in DELETED_APP_SCOPES
     ]
     if not entries:
-        print(f"🖱 没有可显示的触发器 | {FONT} size=13 color={COLOR_ERR} refresh=true")
+        print(f"没有可显示的触发器 | {FONT} size=13 color={COLOR_ERR} refresh=true")
         print("---")
         print(f"BTT 没运行，或者触发器都在回收站里 | {FONT} size=12 color={COLOR_ERR} refresh=true")
         return
@@ -425,7 +425,7 @@ def print_menu():
             row["name"] = f'{row["name"]} #{row["uuid"][:4].lower()}'
 
     enabled = sum(1 for row in rows if row["on"])
-    print(f"🖱 {enabled} | {FONT} size=13 refresh=true")
+    print(f"{enabled} | {FONT} size=13 refresh=true")
     print("---")
 
     by_group = {}

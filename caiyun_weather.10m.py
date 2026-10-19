@@ -241,6 +241,24 @@ def format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind
     return " ".join(parts)
 
 
+def sunset_in_hour(daily_astro, h_dt, now):
+    """若日落发生在 h_dt 这一小时内且尚未过去，返回 'HH:MM'，否则返回 None"""
+    date_str = h_dt.strftime("%Y-%m-%d")
+    for a in daily_astro or []:
+        if a.get("date") != date_str:
+            continue
+        try:
+            ss = datetime.strptime(
+                f"{date_str} {a.get('sunset', {}).get('time', '')}", "%Y-%m-%d %H:%M"
+            )
+        except (TypeError, ValueError):
+            return None
+        if h_dt <= ss < h_dt + timedelta(hours=1) and ss >= now:
+            return ss.strftime("%H:%M")
+        return None
+    return None
+
+
 def format_daily_line(i, daily_temp, daily_skycon, daily_aqi, daily_wind, today, weekdays):
     """格式化单条天级预报行"""
     t = daily_temp[i]
@@ -292,6 +310,22 @@ def apparent_temperature(temp_c, humidity_frac, wind_speed_ms):
     else:
         # 低温：标准风寒公式（单位 °C / m/s）
         return 13.12 + 0.6215 * t - 11.37 * (ws ** 0.16) + 0.3965 * t * (ws ** 0.16)
+
+
+def rain_within_hours(hourly_precip, minutely_precip_2h, now, hours=24, threshold=0.1):
+    """未来 hours 小时内是否有降水（逐小时/分钟级降水强度 mm/h 任一超过阈值）"""
+    deadline = now + timedelta(hours=hours)
+    hour_start = now.replace(minute=0, second=0, microsecond=0)
+    for h in hourly_precip or []:
+        try:
+            dt = datetime.strptime(h.get("datetime", ""), "%Y-%m-%d %H:%M")
+        except (TypeError, ValueError):
+            continue
+        if hour_start <= dt <= deadline and h.get("value", 0) >= threshold:
+            return True
+    if minutely_precip_2h and max(minutely_precip_2h) >= threshold:
+        return True
+    return False
 
 
 def precip_level(val):
@@ -551,13 +585,16 @@ def main():
     daily_skycon = daily.get("skycon", [])
     daily_aqi = daily.get("aqi", [])
     daily_wind = daily.get("wind", [])
+    daily_astro = daily.get("astro", [])
 
     # 菜单栏标题 (简洁)
     # title_icon = skycon.split()[0] if " " in skycon else "🌡️"
     # title_icon = skycon.split()[1] if " " in skycon else ""
     title_icon = skycon.replace(' ', '')
+    # 未来24小时内会下雨时，标题最前方加 ❗️
+    rain_flag = "❗️" if rain_within_hours(hourly_precip, minutely.get("precipitation_2h", []), datetime.now()) else ""
     # print(f"{title_icon}  {temp:.1f}°C | font='Sarasa Mono SC' refresh=true size=13")
-    print(f"{title_icon} {temp:.1f} | font='Sarasa Mono SC' refresh=true size=13")
+    print(f"{rain_flag}{title_icon} {temp:.1f} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 数据更新时间
@@ -641,20 +678,28 @@ def main():
         hourly_count = len(hourly_temp)
         direct_hours = 12
         end_idx = min(start_idx + direct_hours, hourly_count)
-        for i in range(start_idx, end_idx):
-            # 仅当前 10 小时且无雨时显示体感温度
+
+        def print_hourly(i, prefix=""):
             show_apparent = (i - start_idx) < 24
             line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
                                       hourly_humidity, show_apparent)
-            print(f"{line} | font='Sarasa Mono SC' size=13 refresh=true")
+            print(f"{prefix}{line} | font='Sarasa Mono SC' size=13 refresh=true")
+            try:
+                h_dt = datetime.strptime(hourly_temp[i].get("datetime", ""), "%Y-%m-%d %H:%M")
+            except (TypeError, ValueError):
+                return
+            ss = sunset_in_hour(daily_astro, h_dt, now)
+            if ss:
+                print(f"{prefix}🌇 日落 {ss} | font='Sarasa Mono SC' size=13 refresh=true")
+
+        for i in range(start_idx, end_idx):
+            print_hourly(i)
 
         # 12 小时以上的更长远期预报，放入可折叠子菜单
         if end_idx < hourly_count:
             print("逐小时预报 | font='Sarasa Mono SC' size=13 refresh=true")
             for i in range(end_idx, hourly_count):
-                line = format_hourly_line(i, hourly_temp, hourly_skycon, hourly_precip, hourly_wind, hourly_aqi, now,
-                                          hourly_humidity, show_apparent)
-                print(f"-- {line} | font='Sarasa Mono SC' size=13 refresh=true")
+                print_hourly(i, "-- ")
         print("---")
 
     # 未来天级预报
