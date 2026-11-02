@@ -10,7 +10,7 @@ SwiftBar 插件: Clash 状态监控（9090 端口）
 刷新频率: 1 分钟（文件名中的 .1m. 控制）
 
 功能:
-- 菜单栏显示当前代理节点的国旗/地区旗和延迟（直连时显示「🌐 直连」）
+- 菜单栏用单字母缩写显示当前地区（香港 H / 新加坡 S / 全部 A / 直连 D）和延迟
 - 点击标题立即刷新
 - 下拉菜单显示实时上下行速率/总量、当前模式、已选地区组
 - 支持在指定 Selector 组内一键切换地区/线路（含直连，直接平铺展示，不折叠）
@@ -128,6 +128,19 @@ def is_direct(name: str, info: dict) -> bool:
     return name == "DIRECT" or info.get("type") == "Direct"
 
 
+TITLE_TAGS = (("香港", "H"), ("新加坡", "S"), ("全部", "A"))
+
+
+def title_tag(name: str, info: dict) -> str:
+    """菜单栏标题用的单字母地区缩写；未知节点退回国旗。"""
+    if is_direct(name, info):
+        return "D"
+    for keyword, tag in TITLE_TAGS:
+        if keyword in name:
+            return tag
+    return extract_flag(name)
+
+
 def latency_color(ms: Optional[int]) -> str:
     if ms is None:
         return "#888888"
@@ -230,13 +243,13 @@ def main():
 
     delay = live_delay if live_delay is not None else last_history_delay(current_info)
 
-    # 3) 标题：国旗 + 延迟；直连不测速，直接标出来
-    flag = extract_flag(current)
+    # 3) 标题：地区缩写 + 延迟；直连不测速，直接标出来
+    tag = title_tag(current, current_info)
     delay_text = f"{delay}ms" if delay is not None else "-"
     if on_direct:
-        print(f"{flag} {display_name(current)} | font='Sarasa Mono SC' refresh=true size=13")
+        print(f"{tag} {display_name(current)} | font='Sarasa Mono SC' refresh=true size=13")
     else:
-        print(f"{flag} {delay_text} | font='Sarasa Mono SC' refresh=true size=13")
+        print(f"{tag} {delay_text} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 4) 实时速率
