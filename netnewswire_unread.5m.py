@@ -10,7 +10,7 @@ SwiftBar 插件: NetNewsWire 未读数
 
 - 菜单栏显示未读总数，非 0 时蓝色
 - 左键点击：标题先显示「抓取中」，触发 NetNewsWire 抓取，完成后显示
-  「抓取完成」2 秒，再还原成纯数字
+  「抓取完成」听一会，再还原成纯数字
 - 右键：查看各账号未读数、上次抓取成功时间
 - 定时刷新另外由 local_rss 的 run.sh 负责
 """
@@ -40,7 +40,7 @@ CACHE_PATH = Path.home() / "Library" / "Caches" / "swiftbar-netnewswire.json"
 REQUEST_PATH = Path.home() / "Library" / "Caches" / "swiftbar-netnewswire.request"
 
 FETCH_SETTLE_SECONDS = 2.5
-DONE_SHOW_SECONDS = 2
+DONE_SHOW_SECONDS = 0.1
 UI_STATE_TTL = 30
 
 REFRESH_SCRIPT = """
@@ -207,9 +207,10 @@ def take_request() -> bool:
 
 
 def refresh_plugin() -> None:
-    name = urllib.parse.quote(Path(sys.argv[0]).name)
+    # SwiftBar 2.1.x 里插件 ID 是绝对路径，refreshplugin 只认短名；传完整文件名匹配不到（2.1.2 才修复）
+    name = urllib.parse.quote(Path(sys.argv[0]).name.split(".")[0])
     subprocess.run(
-        ["/usr/bin/open", f"swiftbar://refreshplugin?name={name}"],
+        ["/usr/bin/open", "-g", f"swiftbar://refreshplugin?name={name}"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
