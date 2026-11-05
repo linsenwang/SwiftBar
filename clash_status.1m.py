@@ -249,7 +249,7 @@ def main():
     if on_direct:
         print(f"{tag} {display_name(current)} | font='Sarasa Mono SC' refresh=true size=13")
     else:
-        print(f"{tag} {delay_text} | font='Sarasa Mono SC' refresh=true size=13")
+        print(f"{delay_text}{tag} | font='Sarasa Mono SC' refresh=true size=13")
     print("---")
 
     # 4) 实时速率
